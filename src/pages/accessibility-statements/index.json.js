@@ -6,6 +6,11 @@ const result = await dbquery.selectQuery(sparql);
 
 export async function GET({params, request}) {
   return new Response(
-    JSON.stringify(result)
+    result, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    }
   )
 }

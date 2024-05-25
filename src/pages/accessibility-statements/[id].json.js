@@ -10,9 +10,10 @@ export const GET: APIRoute = ({ params, request }) => {
     })
   )
 }
-
+/*
 export async function getStaticPaths() { 
 	const module = await import('./ids.js');
 	const {ids} = module;
 	return (ids);
 }
+*/
