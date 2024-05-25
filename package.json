@@ -10,6 +10,9 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^4.9.1"
+    "astro": "^4.9.1",
+    "commonmark": "^0.31.0",
+    "inquirer": "^9.2.22",
+    "parse-md": "^3.0.3"
   }
 }
