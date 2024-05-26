@@ -1,19 +1,18 @@
-import type { APIRoute } from 'astro';
+import * as dbquery from '../../script/dbquery.js';
 
-const usernames = ["Sarah", "Chris", "Yan", "Elian"]
+const sparql = "select distinct ?id ?label ?stmt where { ?id a a11y:AccessibilityStatement . ?id rdfs:label ?label ; a11y:stmtGuidance ?stmt } order by ?label";
+var result;
 
-export const GET: APIRoute = ({ params, request }) => {
-  const id = params.id;
+export async function GET ({params, request}) => {
+    
+    result = "hi"//await dbquery.selectQuery(sparql);
+
   return new Response(
-    JSON.stringify({
-      name: usernames[id]
-    })
+    JSON.stringify(result), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    }
   )
 }
-/*
-export async function getStaticPaths() { 
-	const module = await import('./ids.js');
-	const {ids} = module;
-	return (ids);
-}
-*/
