@@ -11,5 +11,8 @@
     "url": "https://github.com/michael-n-cooper/daf-back.git"
   },
   "author": "Michael Cooper",
-  "license": "CC-BY-NC-SA-4.0"
+  "license": "CC-BY-NC-SA-4.0",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
 }
