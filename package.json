@@ -1,0 +1,15 @@
+{
+  "name": "daf-back",
+  "version": "1.0.0",
+  "description": "Backend and API for Digital Accessibility Framework database",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michael-n-cooper/daf-back.git"
+  },
+  "author": "Michael Cooper",
+  "license": "CC-BY-NC-SA-4.0"
+}
