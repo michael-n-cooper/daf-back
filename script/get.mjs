@@ -2,7 +2,7 @@ import {selectQuery} from './dbquery.mjs';
 
 export async function getSection(req) {
     console.log("hre");
-    const val = await findStatements();//sectionMappings[req.params.section].list;
+    const val = sectionMappings[req.params.section].list.call();
     console.log("there");
     return val;
 }
