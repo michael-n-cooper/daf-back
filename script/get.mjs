@@ -6,7 +6,9 @@ export async function getSection(req) {
 }
 
 export async function getId(req) {
-
+    console.log(sectionMappings[req.params.section].list.call(this, req.params.id));
+    const val = await selectQuery(sectionMappings[req.params.section].list.call(this, req.params.id));
+    return cleanResults(val);
 }
 
 export async function getSupports(req) {
@@ -16,7 +18,7 @@ export async function getSupports(req) {
 function lookupType(type) { return "select ?id ?label where { ?id a a11y:" + type + " ; rdfs:label ?label } order by ?label" }
 function lookupSupports(supportsType) {}
 
-function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where { " + (typeof id !== "undefined" ? "values ?id {a11y:" + id + "}": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
+function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where { " + (typeof id !== "undefined" ? "values ?id {:" + id + "}": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
 function findCategories() { return lookupType("Category") }
 function findFunctionalNeedCategories() { return lookupType("FunctionalNeedCategory") }
 function findUserNeedCategories() { return lookupType("UserNeedCategory") }

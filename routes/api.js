@@ -10,8 +10,11 @@ const sectionRouter = async function (req, res, next) {
 }
 
 const sectionIdRouter = function (req, res, next) {
-    res.json({"section": req.params.section, "id": req.params.id});
-    next();
+    import ('../script/get.mjs').then(async(get) => {
+        var val = await get.getId(req);
+        res.json(val);
+        next();
+    });
 }
 
 const sectionIdSupportsRouter = function (req, res, next) {
