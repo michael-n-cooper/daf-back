@@ -15,12 +15,12 @@ export async function getSupports(req) {
 
 }
 
-function lookupType(type) { return "select ?id ?label where { ?id a a11y:" + type + " ; rdfs:label ?label } order by ?label" }
+function lookupType(type, id) { return "select ?id ?label where {" + (typeof id !== "undefined" ? " values ?id {:" + id + "} . ": "") + " ?id a a11y:" + type + " ; rdfs:label ?label } order by ?label" }
 function lookupSupports(supportsType) {}
 
-function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where { " + (typeof id !== "undefined" ? "values ?id {:" + id + "}": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
+function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where {" + (typeof id !== "undefined" ? " values ?id {:" + id + "} . ": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
 function findCategories() { return lookupType("Category") }
-function findFunctionalNeedCategories() { return lookupType("FunctionalNeedCategory") }
+function findFunctionalNeedCategories(id) { return lookupType("FunctionalNeedCategory", id) }
 function findUserNeedCategories() { return lookupType("UserNeedCategory") }
 function findMappings() { return lookupType("Mapping") }
 function findIntersectionMappings() { return lookupType("IntersectionMapping") }
