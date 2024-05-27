@@ -1,8 +1,10 @@
 import {selectQuery} from './dbquery.mjs';
 
 export async function getSection(req) {
-    const val = sectionMappings[req.params.section].list.call();
-    return val;
+    console.log(sectionMappings[req.params.section].list.call());
+    const val = await selectQuery(sectionMappings[req.params.section].list.call());
+    console.log(val);
+    return cleanResults(val);
 }
 
 export async function getId(req) {
@@ -13,41 +15,37 @@ export async function getSupports(req) {
 
 }
 
-async function findStatements() {
-    const sparql = "select distinct ?id ?label ?stmt where { ?id a a11y:AccessibilityStatement . ?id rdfs:label ?label ; a11y:stmtGuidance ?stmt } order by ?label";
-    const result = await selectQuery(sparql);
-    console.log(result);
-    return cleanResults(result);
-}
-
-async function findCategories() {}
-async function findFunctionalNeedCategories() {}
-async function findUserNeedCategories() {}
-async function findMappings() {}
-async function findIntersectionMappings() {}
-async function findMatrixMappings() {}
-async function findMatrixDimensions() {}
-async function findFunctionalNeeds() {}
-async function findFunctionalNeedSupports() {}
-async function findUserNeeds() {}
-async function findUserNeedSupports() {}
-async function findUserNeedRelevances() {}
-async function findUserNeedRelevanceSupports() {}
-async function findReferences() {}
-async function findReferenceSupports() {}
-async function findTerms() {}
-async function findTermSupports() {}
-async function findReferenceTypes() {}
-async function findReferenceTypeSupports() {}
-async function findTags() {}
-async function findTagSupports() {}
+function lookupType(type) { return "select ?id ?label where { ?id a a11y:" + type + " rdfs:label ?label } order by ?label" }
+function lookupSupports(supportsType) {}
+function findStatements() { return "select distinct ?id ?label ?stmt ?note where { ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
+function findCategories() {}
+function findFunctionalNeedCategories() { return lookupType("FunctionalNeedCategory") }
+function findUserNeedCategories() {}
+function findMappings() {}
+function findIntersectionMappings() {}
+function findMatrixMappings() {}
+function findMatrixDimensions() {}
+function findFunctionalNeeds() {}
+function findFunctionalNeedSupports() {}
+function findUserNeeds() {}
+function findUserNeedSupports() {}
+function findUserNeedRelevances() {}
+function findUserNeedRelevanceSupports() {}
+function findReferences() {}
+function findReferenceSupports() {}
+function findTerms() {}
+function findTermSupports() {}
+function findReferenceTypes() {}
+function findReferenceTypeSupports() {}
+function findTags() {}
+function findTagSupports() {}
 
 function cleanResults(result) {
     let arr = new Array();
     result.results.bindings.forEach(function(binding) {
         let obj = {};
         result.head.vars.forEach(function(col) {
-            obj[col] = binding[col].value;
+            obj[col] = typeof binding[col] !== "undefined" ? binding[col].value : null;
         });
         arr.push(obj);
     });
