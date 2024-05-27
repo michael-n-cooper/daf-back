@@ -1,9 +1,7 @@
 import {selectQuery} from './dbquery.mjs';
 
 export async function getSection(req) {
-    console.log("hre");
     const val = sectionMappings[req.params.section].list.call();
-    console.log("there");
     return val;
 }
 
@@ -18,7 +16,8 @@ export async function getSupports(req) {
 async function findStatements() {
     const sparql = "select distinct ?id ?label ?stmt where { ?id a a11y:AccessibilityStatement . ?id rdfs:label ?label ; a11y:stmtGuidance ?stmt } order by ?label";
     const result = await selectQuery(sparql);
-    return result;
+    console.log(result);
+    return cleanResults(result);
 }
 
 async function findCategories() {}
@@ -42,6 +41,18 @@ async function findReferenceTypes() {}
 async function findReferenceTypeSupports() {}
 async function findTags() {}
 async function findTagSupports() {}
+
+function cleanResults(result) {
+    let arr = new Array();
+    result.results.bindings.forEach(function(binding) {
+        let obj = {};
+        result.head.vars.forEach(function(col) {
+            obj[col] = binding[col].value;
+        });
+        arr.push(obj);
+    });
+    return arr;
+}
 
 const sectionMappings = {
     "statements": {
