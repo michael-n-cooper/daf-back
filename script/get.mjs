@@ -19,26 +19,26 @@ function lookupType(type, id) { return "select ?id ?label where {" + (typeof id 
 function lookupSupports(supportsType) {}
 
 function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where {" + (typeof id !== "undefined" ? " values ?id {:" + id + "} . ": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
-function findCategories() { return lookupType("Category") }
+function findCategories(id) { return lookupType("Category") }
 function findFunctionalNeedCategories(id) { return lookupType("FunctionalNeedCategory", id) }
-function findUserNeedCategories() { return lookupType("UserNeedCategory") }
-function findMappings() { return lookupType("Mapping") }
-function findIntersectionMappings() { return lookupType("IntersectionMapping") }
-function findMatrixMappings() { return lookupType("MatrixMapping") }
-function findMatrixDimensions() { return lookupType("MatrixDimension") }
-function findFunctionalNeeds() { return lookupType("FunctionalNeed") }
+function findUserNeedCategories(id) { return lookupType("UserNeedCategory") }
+function findMappings(id) { return lookupType("Mapping") }
+function findIntersectionMappings(id) { return lookupType("IntersectionMapping") }
+function findMatrixMappings(id) { return lookupType("MatrixMapping") }
+function findMatrixDimensions(id) { return lookupType("MatrixDimension") }
+function findFunctionalNeeds(id) { return lookupType("FunctionalNeed") }
 function findFunctionalNeedSupports() {}
-function findUserNeeds() { return lookupType("UserNeed") }
+function findUserNeeds(id) { return lookupType("UserNeed") }
 function findUserNeedSupports() {}
-function findUserNeedRelevances() { return lookupType("UserNeedContext") }
+function findUserNeedRelevances(id) { return lookupType("UserNeedContext") }
 function findUserNeedRelevanceSupports() {}
-function findReferences() { return lookupType("Reference") }
+function findReferences(id) { return lookupType("Reference") }
 function findReferenceSupports() {}
-function findTerms() { return lookupType("Term") }
+function findTerms(id) { return lookupType("Term") }
 function findTermSupports() {}
-function findReferenceTypes() { return lookupType("ReferenceType") }
+function findReferenceTypes(id) { return lookupType("ReferenceType") }
 function findReferenceTypeSupports() {}
-function findTags() { return lookupType("Tag") }
+function findTags(id) { return lookupType("Tag") }
 function findTagSupports() {}
 
 function cleanResults(result) {
