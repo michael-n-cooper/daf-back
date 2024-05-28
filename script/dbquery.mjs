@@ -15,7 +15,7 @@ export async function selectQuery(sparql) {
 	    body: prefixes + sparql
 	  });
 	const json = await post_response.json();
-	return (json);
+	return cleanResults(json);
 }
 
 export async function updateQuery(sparql) {
@@ -29,3 +29,16 @@ export async function updateQuery(sparql) {
 	//return (json);
 	return true;
 }
+
+function cleanResults(result) {
+    let arr = new Array();
+    result.results.bindings.forEach(function(binding) {
+        let obj = {};
+        result.head.vars.forEach(function(col) {
+            obj[col] = typeof binding[col] !== "undefined" ? binding[col].value : null;
+        });
+        arr.push(obj);
+    });
+    return arr;
+}
+
