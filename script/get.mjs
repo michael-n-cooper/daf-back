@@ -18,22 +18,25 @@ async function lookupTypeId(type, id) {
     if (type == "AccessibilityStatement") return findStatementId(id);
 
     const sparql = "select ?id ?label ?type where { values ?id {:" + id + "} . bind((a11y:" + type + ") as ?type) . ?id a a11y:" + type + " . optional {?id rdfs:label ?label} } order by ?label";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return cleanResults(val);
 }
 async function lookupTypeList(type, supportsId) { 
+    if (type == "AccessibilityStatement") return findStatementList(supportsId);
+
     const sparql = "select ?id ?label ?type where {" + (typeof supportsId !== "undefined" ? " ?id a11y:supports :" + supportsId + " . " : "") + " bind((a11y:" + type + ") as ?type) . ?id a a11y:" + type + " . optional {?id rdfs:label ?label} } order by ?label";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return cleanResults(val);
 }
 
 async function findStatementId(id) {
-    if (type == "AccessibilityStatement") return findStatementList(id);
     const sparql = "select distinct ?id ?label ?type ?stmt ?note where { values ?id {:" + id + "} . bind((a11y:AccessibilityStatement) as ?type) . ?id a ?type ; a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
-    const val = await selectQuery(sparql);
-    return cleanResults(val);
+    const val = cleanResults(await selectQuery(sparql));
+    const refs = await findReferenceList(id);
+    console.log(val);
+
+    val[0].references = refs;
+    return val;
 }
 async function findStatementList(supportsId) {
     const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + (typeof supportsId !== "undefined" ? " ?id a11y:supports/a11y:supports :" + supportsId + " . " : "") + " bind((a11y:AccessibilityStatement) as ?type) . ?id a ?type ; a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
@@ -76,8 +79,15 @@ async function findUserNeedRelevances(id) {
 }
 async function findUserNeedRelevanceSupports() {
 }
-async function findReferences(id) {
-    return lookupTypeList("Reference") 
+async function findReferenceId(id) {
+    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote where { values ?id {:" + id + "} . bind((a11y:Reference) as ?type) . ?id a ?type ; a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
+}
+async function findReferenceList(supportsId) {
+    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote where {" + (typeof supportsId !== "undefined" ? " :" + supportsId + " a11y:references ?id . " : "") + " bind((a11y:Reference) as ?type) . ?id a ?type ; a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
 }
 async function findReferenceSupports() {
 }
@@ -159,7 +169,7 @@ const sectionMappings = {
     },
     "references": {
         "type": "Reference",
-        "list": findReferences,
+        "list": findReferenceList,
         "supports": findReferenceSupports
     },
     "term-sets": {
