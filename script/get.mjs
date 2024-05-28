@@ -1,45 +1,101 @@
 import {selectQuery} from './dbquery.mjs';
 
 export async function getSection(req) {
-    const val = await selectQuery(sectionMappings[req.params.section].list.call());
-    return cleanResults(val);
+    const val = await lookupTypeList(sectionMappings[req.params.section].type);
+    return val;
 }
 
 export async function getId(req) {
-    console.log(sectionMappings[req.params.section].list.call(this, req.params.id));
-    const val = await selectQuery(sectionMappings[req.params.section].list.call(this, req.params.id));
-    return cleanResults(val);
+    const val = await lookupTypeId(sectionMappings[req.params.section].type, req.params.id);
+    return val;
 }
 
 export async function getSupports(req) {
 
 }
 
-function lookupType(type, id) { return "select ?id ?label where {" + (typeof id !== "undefined" ? " values ?id {:" + id + "} . ": "") + " ?id a a11y:" + type + " ; rdfs:label ?label } order by ?label" }
-function lookupSupports(supportsType) {}
+async function lookupTypeId(type, id) { 
+    if (type == "AccessibilityStatement") return findStatementId(id);
 
-function findStatements(id) { return "select distinct ?id ?label ?stmt ?note where {" + (typeof id !== "undefined" ? " values ?id {:" + id + "} . ": "") + " ?id a a11y:AccessibilityStatement ; rdfs:label ?label ; a11y:stmtGuidance ?stmt . optional { ?id a11y:note ?note} } order by ?label" }
-function findCategories(id) { return lookupType("Category") }
-function findFunctionalNeedCategories(id) { return lookupType("FunctionalNeedCategory", id) }
-function findUserNeedCategories(id) { return lookupType("UserNeedCategory") }
-function findMappings(id) { return lookupType("Mapping") }
-function findIntersectionMappings(id) { return lookupType("IntersectionMapping") }
-function findMatrixMappings(id) { return lookupType("MatrixMapping") }
-function findMatrixDimensions(id) { return lookupType("MatrixDimension") }
-function findFunctionalNeeds(id) { return lookupType("FunctionalNeed") }
-function findFunctionalNeedSupports() {}
-function findUserNeeds(id) { return lookupType("UserNeed") }
-function findUserNeedSupports() {}
-function findUserNeedRelevances(id) { return lookupType("UserNeedContext") }
-function findUserNeedRelevanceSupports() {}
-function findReferences(id) { return lookupType("Reference") }
-function findReferenceSupports() {}
-function findTerms(id) { return lookupType("Term") }
-function findTermSupports() {}
-function findReferenceTypes(id) { return lookupType("ReferenceType") }
-function findReferenceTypeSupports() {}
-function findTags(id) { return lookupType("Tag") }
-function findTagSupports() {}
+    const sparql = "select ?id ?label ?type where { values ?id {:" + id + "} . bind((a11y:" + type + ") as ?type) . ?id a a11y:" + type + " . optional {?id rdfs:label ?label} } order by ?label";
+    console.log(sparql);
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
+}
+async function lookupTypeList(type, supportsId) { 
+    const sparql = "select ?id ?label ?type where {" + (typeof supportsId !== "undefined" ? " ?id a11y:supports :" + supportsId + " . " : "") + " bind((a11y:" + type + ") as ?type) . ?id a a11y:" + type + " . optional {?id rdfs:label ?label} } order by ?label";
+    console.log(sparql);
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
+}
+
+async function findStatementId(id) {
+    if (type == "AccessibilityStatement") return findStatementList(id);
+    const sparql = "select distinct ?id ?label ?type ?stmt ?note where { values ?id {:" + id + "} . bind((a11y:AccessibilityStatement) as ?type) . ?id a ?type ; a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
+}
+async function findStatementList(supportsId) {
+    const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + (typeof supportsId !== "undefined" ? " ?id a11y:supports/a11y:supports :" + supportsId + " . " : "") + " bind((a11y:AccessibilityStatement) as ?type) . ?id a ?type ; a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
+    const val = await selectQuery(sparql);
+    return cleanResults(val);
+}
+async function findCategories(id) {
+    return lookupTypeList("Category") 
+}
+async function findFunctionalNeedCategories(id) { 
+    return lookupTypeList("FunctionalNeedCategory", id) 
+}
+async function findUserNeedCategories(id) {
+    return lookupTypeList("UserNeedCategory") 
+}
+async function findMappings(id) { 
+    return lookupTypeList("Mapping")
+}
+async function findIntersectionMappings(id) { 
+    return lookupTypeList("IntersectionMapping")
+}
+async function findMatrixMappings(id) { 
+    return lookupTypeList("MatrixMapping")
+}
+async function findMatrixDimensions(id) { 
+    return lookupTypeList("MatrixDimension")
+}
+async function findFunctionalNeeds(id) { 
+    return lookupTypeList("FunctionalNeed")
+}
+async function findFunctionalNeedSupports() {
+}
+async function findUserNeeds(id) { 
+    return lookupTypeList("UserNeed")
+}
+async function findUserNeedSupports() {
+}
+async function findUserNeedRelevances(id) { 
+    return lookupTypeList("UserNeedContext")
+}
+async function findUserNeedRelevanceSupports() {
+}
+async function findReferences(id) {
+    return lookupTypeList("Reference") 
+}
+async function findReferenceSupports() {
+}
+async function findTerms(id) { 
+    return lookupTypeList("Term") 
+}
+async function findTermSupports() {
+}
+async function findReferenceTypes(id) {
+    return lookupTypeList("ReferenceType") 
+}
+async function findReferenceTypeSupports() {
+}
+async function findTags(id) { 
+    return lookupTypeList("Tag") 
+}
+async function findTagSupports() {
+}
 
 function cleanResults(result) {
     let arr = new Array();
@@ -56,7 +112,7 @@ function cleanResults(result) {
 const sectionMappings = {
     "statements": {
         "type": "AccessibilityStatement",
-        "list": findStatements
+        "list": findStatementList
     },
     "categories": {
         "type": "Category",
