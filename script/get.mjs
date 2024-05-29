@@ -79,6 +79,21 @@ async function findFunctionalNeedId(id) {
 
     return val;
 }
+async function findIntersectionNeedList(supportsFilter = "") {
+    const val = await lookupTypeList("IntersectionNeed", supportsFilter); 
+    return val;
+}
+async function findIntersectionNeedId(id) {
+    const val = await lookupTypeId("IntersectionNeed", id);
+
+    const fns = await findFunctionalNeedList(" :" + id + "a11y:supports ?id . ");
+    val[0].functionalNeeds = fns;
+
+    const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
+    val[0].statements = stmts;
+
+    return val;
+}
 /*
 async function findUserNeedCategories(id) {
     return lookupTypeList("UserNeedCategory") 
@@ -137,12 +152,12 @@ async function findUserNeedRelevanceId(id) {
 }
 
 async function findReferenceId(id) {
-    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote where { values ?id {:" + id + "} . " + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
+    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote ?stmtId ?stmtLabel where { values ?id {:" + id + "} . " + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . ?stmtId a11y:references ?id . ?stmtId rdfs:label ?stmtLabel . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
     const val = await selectQuery(sparql);
     return val;
 }
 async function findReferenceList(supportsFilter = "") {
-    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote where {" + supportsFilter + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
+    const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote ?stmtId ?stmtLabel where {" + supportsFilter + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . ?stmtId a11y:references ?id . ?stmtId rdfs:label ?stmtLabel . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
     console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
@@ -181,6 +196,7 @@ const sectionMappings = [
     { "path": "matrix-mappings", "type": "MatrixMapping", "listFunc": findMatrixMappingList, "idFunc": findMatrixMappingId },
     //{ "path": "matrix-dimensions", "type": "MatrixDimension", "listFunc": find@@List, "idFunc": find@@Id },
     { "path": "functional-needs", "type": "FunctionalNeed", "listFunc": findFunctionalNeedList, "idFunc": findFunctionalNeedId },
+    { "path": "intersection-needs", "type": "IntersectionNeed", "listFunc": findIntersectionNeedList, "idFunc": findIntersectionNeedId },
     { "path": "user-needs", "type": "UserNeed", "listFunc": findUserNeedList, "idFunc": findUserNeedId },
     { "path": "user-need-contexts", "type": "UserNeedRelevance", "listFunc": findUserNeedRelevanceList, "idFunc": findUserNeedRelevanceId },
     { "path": "references", "type": "Reference", "listFunc": findReferenceList, "idFunc": findReferenceId },
