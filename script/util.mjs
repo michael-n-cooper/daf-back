@@ -1,5 +1,5 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
-import * as commonmark from 'commonmark';
+//import * as commonmark from 'commonmark';
 
 // Function to find an object based on multiple properties
 export function findObjectByProperties(array, properties) {

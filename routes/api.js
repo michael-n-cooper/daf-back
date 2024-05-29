@@ -17,13 +17,7 @@ const sectionIdRouter = function (req, res, next) {
     });
 }
 
-const sectionIdSupportsRouter = function (req, res, next) {
-    res.json({"section": req.params.section, "id": req.params.id, "supports": req.params.supports});
-    next();
-}
-
 router.get('/:section', sectionRouter);
 router.get('/:section/:id', sectionIdRouter);
-router.get('/:section/:id/:supports', sectionIdSupportsRouter);
 
 module.exports = router;
