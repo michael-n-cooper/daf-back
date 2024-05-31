@@ -68,10 +68,12 @@ async function findFunctionalNeedCategoryId(id) {
     return val;
 }
 async function findFunctionalNeedList(supportsFilter = "") { 
-    const val = await lookupTypeList("FunctionalNeed", supportsFilter); 
+    const sparql = "select ?id ?label ?type ?categoryId where {" + supportsFilter + narrowType("FunctionalNeed") + " ?id a11y:supports ?categoryId . ?categoryId a a11y:FunctionalNeedCategory . optional {?id rdfs:label ?label} } order by ?label";
+    const val = await selectQuery(sparql); 
     return val;
 }
 async function findFunctionalNeedId(id) { 
+    const sparql = "select ?id ?label ?type ?categoryId where { values ?id {:" + id + "} . " + narrowType("FunctionalNeed") + " ?id a11y:supports ?categoryId . ?categoryId a a11y:FunctionalNeedCategory . optional {?id rdfs:label ?label} } order by ?label";
     const val = await lookupTypeId("FunctionalNeed", id);
 
     const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
