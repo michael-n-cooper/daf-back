@@ -111,7 +111,7 @@ async function findMappingId(id) {
     return val;
 }
 async function findMappingList(type = "Mapping", supportsFilter = "") { 
-    const sparql = "select ?id ?applicable ?stmtId ?fnId ?unId ?unrId where { " + supportsFilter + narrowType(type) + " ?stmtId a11y:supports ?id . ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id ?applicable ?stmtId ?fnId ?unId ?unrId where { " + supportsFilter + narrowType(type) + " optional { ?stmtId a11y:supports ?id } . ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
     const val = await selectQuery(sparql);
     return val;
 }
