@@ -1,11 +1,11 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
 import parseMD from 'parse-md';
-import * as dbquery from './dbquery.js';
-import {findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql} from './util-base.js';
+import * as dbquery from '../script/dbquery.mjs';
+import {findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql} from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 
-const importDir = '../../../../accessiblecommunity/Digital-Accessibility-Framework/';
+const importDir = '../../../../../accessiblecommunity/Digital-Accessibility-Framework/';
 const importFileName = await inquirer.prompt([{"name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName); 
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
