@@ -8,5 +8,8 @@
     "test": "test"
   },
   "author": "Michael Cooper",
-  "license": "CC-BY-NC-SA-4.0"
+  "license": "CC-BY-NC-SA-4.0",
+  "dependencies": {
+    "commonmark": "^0.31.0"
+  }
 }
