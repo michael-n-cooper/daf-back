@@ -1,0 +1,12 @@
+{
+  "name": "daf-back-cli",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Command line interface for stuff not covered by the DAF back API",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Michael Cooper",
+  "license": "CC-BY-NC-SA-4.0"
+}
