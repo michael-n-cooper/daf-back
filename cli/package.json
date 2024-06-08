@@ -11,6 +11,7 @@
   "license": "CC-BY-NC-SA-4.0",
   "dependencies": {
     "commonmark": "^0.31.0",
-    "inquirer": "^9.2.23"
+    "inquirer": "^9.2.23",
+    "parse-md": "^3.0.3"
   }
 }
