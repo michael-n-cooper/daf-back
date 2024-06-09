@@ -82,7 +82,8 @@ async function findFunctionalNeedId(id) {
     return val;
 }
 async function findIntersectionNeedList(supportsFilter = "") {
-    const val = await lookupTypeList("IntersectionNeed", supportsFilter); 
+    const sparql = 'select ?id ?label ?fn1 ?fn2 where { ?id a a11y:IntersectionNeed ; a11y:supports ?fn1 ; a11y:supports ?fn2 . filter (!sameterm(?fn1, ?fn2)) . optional { ?id rdfs:label ?label } }';
+    const val = await selectQuery(sparql);
     return val;
 }
 async function findIntersectionNeedId(id) {

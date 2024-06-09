@@ -68,3 +68,9 @@ export function mdToHtml(str) {
 	let result = writer.render(parsed);
 	return result;
 }
+
+export async function apiGet(path) {
+	const data = await fetch ("http://localhost:3000/api/" + path);
+	const json = await data.json();
+	return json;
+}

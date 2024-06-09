@@ -1,11 +1,12 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
 import parseMD from 'parse-md';
 import * as dbquery from '../script/dbquery.mjs';
-import {findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql} from '../script/util.mjs';
+import {findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet} from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
+import { v4 as uuid } from 'uuid';
 
-const importDir = '../../../../../accessiblecommunity/Digital-Accessibility-Framework/';
+const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
 const importFileName = await inquirer.prompt([{"name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName); 
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
@@ -17,11 +18,11 @@ if (data == null) {
 	let sparql = 'select ?id where { ?id a11y:contentIRI <' + contentIriBase + importFileName + '> }';
 	let result = await dbquery.selectQuery(sparql);
 	// previously imported
-	if (result.results.bindings.length > 0) {
+	if (result.length > 0) {
 		const message = "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?";
 		const todel = await inquirer.prompt([{ "name": "todel", "type": "confirm", "message": message, }]).then((answer) => answer.todel);
 		if (todel) {
-			deleteStatement(idFrag(result.results.bindings[0].id.value));
+			deleteStatement(idFrag(result[0].id));
 			console.log("Deleted " + importFileName);
 		} else console.log("Aborting");
 		process.exit(0);
@@ -35,19 +36,20 @@ if (data == null) {
 
 const { metadata, content } = parseMD(data);
 
-const knownMatrix = await getKnownMatrix();
-
 const typos = await getTypos();
-const functionalNeedList = await lookupIdLabels("FunctionalNeed");
-const intersectionNeedList = await lookupIntersectionNeeds();
-const userNeedList = await lookupIdLabels("UserNeed");
-const userNeedRelevanceList = await lookupIdLabels("UserNeedRelevance");
+const functionalNeedList = await apiGet("functional-needs");
+const intersectionNeedList = await apiGet("intersection-needs");
+const userNeedList = await apiGet("user-needs");
+const userNeedRelevanceList = await apiGet("user-need-contexts");
+
+const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedRelevanceList);
+
 await findMatrixTypos();
 
+const mappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
 const mappings = expandMappings(metadata);
-const mappingIds = await getMappingIds(mappings); // ids of the mapping objects corresponding to the above
 const referenceTypes = await lookupIdLabels("ReferenceType");
-const tags = await lookupIdLabels("Tag");
+const tags = await apiGet("tags");
 const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
 const { research, guidelines } = retrieveReferences(metadata); // retrieve references, divide into research and guidelines
 const { title, statement, notes } = retrieveContent(content); // retrieve title and statement
@@ -57,7 +59,7 @@ let stmtId = await checkReimport(contentIriBase + importFileName);
 if (stmtId != false) {
 	
 	// construct the sparql statement
-	if (stmtId == null) stmtId = dbquery.uuid();
+	if (stmtId == null) stmtId = uuid();
 	let sparql = 'insert data { :' + stmtId + ' a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
 	sparql += ' ; a11y:stmtGuidance "' + escSparql(statement) + '"@en';
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
@@ -71,14 +73,14 @@ if (stmtId != false) {
 	});
 	if (research.length > 0) {
 		research.forEach(function(link) {
-			const linkId = dbquery.uuid();
+			const linkId = uuid();
 			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType :' + getIdByLabel(referenceTypes, 'research', 'ReferenceType');
 			sparql += ' . :' + stmtId + ' a11y:references :' + linkId;
 		});
 	}
 	if (guidelines.length > 0) {
 		guidelines.forEach(function(link) {
-			const linkId = dbquery.uuid();
+			const linkId = uuid();
 			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType :' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType');
 			sparql += ' . :' + stmtId + ' a11y:references :' + linkId;
 		});
@@ -88,17 +90,6 @@ if (stmtId != false) {
 	const importResult = await dbquery.updateQuery(sparql);
 	console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
-
-
-// get a {id, label} of matrix dimensions
-async function getKnownMatrix() { // add intersections
-	var matrix = new Array();	
-	const fromDb = await dbquery.selectQuery('select ?id ?label where { ?id a a11y:MatrixDimension ; rdfs:label ?label } order by ?label'); // should split into one for each type to avoid same-label issues
-	fromDb.results.bindings.forEach(function(item) {
-		matrix.push({id: idFrag(item.id.value), label: item.label.value});
-	});
-	return matrix;
-}
 
 // matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(label) {
@@ -117,7 +108,7 @@ function getIntersectionNeedId(fn1, fn2) {
 	const intersection = findObjectByProperties(intersectionNeedList, {"fn1": fn1, "fn2": fn2});
 	
 	if (typeof intersection === 'undefined') {
-		inId = dbquery.uuid();
+		inId = uuid();
 		const label1 = findObjectByProperties(functionalNeedList, {"id": fn1}).label;
 		const label2 = findObjectByProperties(functionalNeedList, {"id": fn2}).label;
 		const update = 'insert data { :' + inId + ' a a11y:IntersectionNeed ; a11y:supports :' + fn1 + ' ; a11y:supports :' + fn2 + ' ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
@@ -126,17 +117,6 @@ function getIntersectionNeedId(fn1, fn2) {
 		inId = intersection.id;
 	}
 	return inId;
-}
-
-// get intersection needs from the db
-async function lookupIntersectionNeeds() {
-	var arr = new Array();
-	const sparql = 'select ?id ?fn1 ?fn2 where { ?id a a11y:IntersectionNeed ; a11y:supports ?fn1 ; a11y:supports ?fn2 . filter (!sameterm(?fn1, ?fn2)) }';
-	const results = await dbquery.selectQuery(sparql);
-	if (typeof results.results.bindings !== 'undefined') results.results.bindings.forEach(function(item) {
-		arr.push({"id": idFrag(item.id.value), "fn1": idFrag(item.fn1.value), "fn2": idFrag(item.fn2.value)});
-	});
-	return arr;
 }
 
 // matrix mappings
@@ -194,17 +174,16 @@ async function getMappingIds(mappings) {
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
-	const sparql = 'select ?id where { ?id a a11y:Mapping ; a11y:supports :' + functionalNeedId + ' ; a11y:supports :' + mapping.UserNeed + ' ; a11y:supports :' + mapping.UserNeedRelevance + ' }';
-	var results = await dbquery.selectQuery(sparql);
-	if (results.results.bindings.length == 0) {
+	var result = findObjectByProperties(mappings, {"fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance});
+	if (typeof result === 'undefined') {
 		var mapType = "MatrixMapping";
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
-		const uuid = dbquery.uuid();
+		const uuid = uuid();
 		const update = 'insert data { :' + uuid + ' a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports :' + functionalNeedId + ' ; a11y:supports :' + mapping.UserNeed + ' ; a11y:supports :' + mapping.UserNeedRelevance + ' }';
 		await dbquery.updateQuery(update);
 		return (uuid);
 	} else {
-		return idFrag(results.results.bindings[0].id.value);
+		return idFrag(result.id);
 	}
 }
 
@@ -218,7 +197,7 @@ function getIdByLabel(arr, label, addClass) {
 	if (typeof idObj !== 'undefined') id = idObj.id;
 	
 	if (id == null && addClass !== undefined) {
-		id = dbquery.uuid();
+		id = uuid();
 		const updateSparql = 'insert data { :' + id + ' a a11y:' + addClass + ' ; rdfs:label "' + label + '"@en }';
 		dbquery.updateQuery(updateSparql);
 	}
@@ -231,9 +210,9 @@ async function lookupIdLabels(type) {
 	var returnval = new Array();
 	const sparql = 'select ?id ?label where { ?id a a11y:' + type + ' ; rdfs:label ?label } order by ?label';
 	const results = await dbquery.selectQuery(sparql);
-	if (results.results.bindings.length > 0) {
-		results.results.bindings.forEach(function(result) {
-			returnval.push({id: idFrag(result.id.value), label: result.label.value});
+	if (results.length > 0) {
+		results.forEach(function(result) {
+			returnval.push({id: idFrag(result.id), label: result.label});
 		});
 	}
 	return returnval;
@@ -440,9 +419,9 @@ function makeInquirerQuestion(qId, label, arr) {
 async function checkReimport(contentIri) {
 	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
 	const result = await dbquery.selectQuery(sparql);
-	if (result.results.bindings.length > 0) {
-		const id = idFrag(result.results.bindings[0].id.value);
-		const label = result.results.bindings[0].label.value;
+	if (result.length > 0) {
+		const id = idFrag(result[0].id);
+		const label = result[0].label;
 		const replace = await inquirer.prompt([{"type": "confirm", "name": "replace", "message": "Do you want to reimport " + label + "?", }]).then((answer) => answer.replace); 
 		if (!replace) return false;
 		else {
