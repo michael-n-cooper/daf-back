@@ -87,7 +87,7 @@ if (stmtId != false) {
 		});
 	}
 	sparql += ' }';
-	console.log(sparql);
+	//console.log(sparql);
 	const importResult = await dbquery.updateQuery(sparql);
 	console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
