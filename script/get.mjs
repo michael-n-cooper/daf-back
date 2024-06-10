@@ -8,7 +8,6 @@ export async function getSection(req) {
 }
 
 export async function getId(req) {
-    console.log(req.params.id);
     const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
     const val = await route.idFunc.call(this, req.params.id);
     return val;
@@ -16,20 +15,17 @@ export async function getId(req) {
 
 async function lookupTypeList(type, supportsFilter = "") { 
     const sparql = "select ?id ?label ?type where {" + supportsFilter + narrowType(type) + " optional {?id rdfs:label ?label} } order by ?label";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
 async function lookupTypeId(type, id) { 
     const sparql = "select ?id ?label ?type where { values ?id {:" + id + "} . " + narrowType(type) + " optional {?id rdfs:label ?label} } order by ?label";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
 
 async function findStatementList(supportsFilter = "") {
     const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
@@ -58,11 +54,9 @@ async function findFunctionalNeedCategoryList(supportsFilter = "") {
     return val;
 }
 async function findFunctionalNeedCategoryId(id) { 
-    console.log(id);
     const val = await lookupTypeId("FunctionalNeedCategory", id);
 
     const fns = await findFunctionalNeedList(" ?id a11y:supports :" + id + " . ");
-    console.log(fns);
     val[0].functionalNeeds = fns;
     
     return val;
@@ -74,7 +68,7 @@ async function findFunctionalNeedList(supportsFilter = "") {
 }
 async function findFunctionalNeedId(id) { 
     const sparql = "select ?id ?label ?type ?categoryId where { values ?id {:" + id + "} . " + narrowType("FunctionalNeed") + " ?id a11y:supports ?categoryId . ?categoryId a a11y:FunctionalNeedCategory . optional {?id rdfs:label ?label} } order by ?label";
-    const val = await lookupTypeId("FunctionalNeed", id);
+    const val = await selectQuery(sparql);
 
     const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
     val[0].statements = stmts;
@@ -87,9 +81,10 @@ async function findIntersectionNeedList(supportsFilter = "") {
     return val;
 }
 async function findIntersectionNeedId(id) {
-    const val = await lookupTypeId("IntersectionNeed", id);
+    const sparql = 'select ?id ?label ?type where { values ?id { :' + id + ' } .  bind((a11y:IntersectionNeed) as ?type) . ?id a ?type . optional {?id rdfs:label ?label} } order by ?label'
+    const val = await selectQuery(sparql);
 
-    const fns = await findFunctionalNeedList(" :" + id + "a11y:supports ?id . ");
+    const fns = await findFunctionalNeedList(" :" + id + " a11y:supports ?id . ");
     val[0].functionalNeeds = fns;
 
     const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
@@ -161,7 +156,6 @@ async function findReferenceId(id) {
 }
 async function findReferenceList(supportsFilter = "") {
     const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote ?stmtId ?stmtLabel where {" + supportsFilter + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . ?stmtId a11y:references ?id . ?stmtId rdfs:label ?stmtLabel . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
