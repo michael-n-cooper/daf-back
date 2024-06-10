@@ -60,8 +60,8 @@ let stmtId = await checkReimport(contentIriBase + importFileName);
 if (stmtId != false) {
 	
 	// construct the sparql statement
-	if (stmtId == null) stmtId = uuid();
-	let sparql = 'insert data { :' + stmtId + ' a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
+	if (stmtId == null) stmtId = idBase + uuid();
+	let sparql = 'insert data { <' + stmtId + '> a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
 	sparql += ' ; a11y:stmtGuidance "' + escSparql(statement) + '"@en';
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
 	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
@@ -74,16 +74,16 @@ if (stmtId != false) {
 	});
 	if (research.length > 0) {
 		research.forEach(function(link) {
-			const linkId = uuid();
-			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
-			sparql += ' . :' + stmtId + ' a11y:references :' + linkId;
+			const linkId = idBase + uuid();
+			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
+			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
 		});
 	}
 	if (guidelines.length > 0) {
 		guidelines.forEach(function(link) {
-			const linkId = uuid();
-			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
-			sparql += ' . :' + stmtId + ' a11y:references <' + linkId + '>';
+			const linkId = idBase + uuid();
+			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
+			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
 		});
 	}
 	sparql += ' }';
@@ -109,10 +109,10 @@ function getIntersectionNeedId(fn1, fn2) {
 	const intersection = findObjectByProperties(intersectionNeedList, {"fn1": fn1, "fn2": fn2});
 	
 	if (typeof intersection === 'undefined') {
-		inId = uuid();
+		inId = idBase + uuid();
 		const label1 = findObjectByProperties(functionalNeedList, {"id": fn1}).label;
 		const label2 = findObjectByProperties(functionalNeedList, {"id": fn2}).label;
-		const update = 'insert data { :' + inId + ' a a11y:IntersectionNeed ; a11y:supports <' + fn1 + '> ; a11y:supports <' + fn2 + '> ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
+		const update = 'insert data { <' + inId + '> a a11y:IntersectionNeed ; a11y:supports <' + fn1 + '> ; a11y:supports <' + fn2 + '> ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
 		dbquery.updateQuery(update);
 	} else {
 		inId = intersection.id;
@@ -167,12 +167,11 @@ async function expandMappings(metadata) {
 async function getMappingId(mapping) {
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
 	var result = findObjectByProperties(dbMappingIds, {"fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance});
-	console.log(result);
 	if (typeof result === 'undefined') {
 		var mapType = "MatrixMapping";
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
-		const id = uuid();
-		const update = 'insert data { :' + id + ' a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
+		const id = idBase + uuid();
+		const update = 'insert data { <' + id + '> a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
 		await dbquery.updateQuery(update);
 		return (idBase + id);
 	} else {
@@ -190,8 +189,8 @@ function getIdByLabel(arr, label, addClass) {
 	if (typeof idObj !== 'undefined') id = idObj.id;
 	
 	if (id == null && addClass !== undefined) {
-		id = uuid();
-		const updateSparql = 'insert data { :' + id + ' a a11y:' + addClass + ' ; rdfs:label "' + label + '"@en }';
+		id = idBase + uuid();
+		const updateSparql = 'insert data { <' + id + '> a a11y:' + addClass + ' ; rdfs:label "' + label + '"@en }';
 		dbquery.updateQuery(updateSparql);
 	}
 	
@@ -205,7 +204,7 @@ async function lookupIdLabels(type) {
 	const results = await dbquery.selectQuery(sparql);
 	if (results.length > 0) {
 		results.forEach(function(result) {
-			returnval.push({id: idFrag(result.id), label: result.label});
+			returnval.push({id: result.id, label: result.label});
 		});
 	}
 	return returnval;
@@ -413,7 +412,7 @@ async function checkReimport(contentIri) {
 	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
 	const result = await dbquery.selectQuery(sparql);
 	if (result.length > 0) {
-		const id = idFrag(result[0].id);
+		const id = result[0].id;
 		const label = result[0].label;
 		const replace = await inquirer.prompt([{"type": "confirm", "name": "replace", "message": "Do you want to reimport " + label + "?", }]).then((answer) => answer.replace); 
 		if (!replace) return false;
@@ -425,8 +424,8 @@ async function checkReimport(contentIri) {
 }
 
 async function deleteStatement(id) {
-	const updateSparql1 = 'delete where { :' + id + ' a11y:references ?s . ?s ?p ?o}';
-	const updateSparql2 = 'delete where { :' + id + ' ?p ?o }';
+	const updateSparql1 = 'delete where { <' + id + '> a11y:references ?s . ?s ?p ?o}';
+	const updateSparql2 = 'delete where { <' + id + '> ?p ?o }';
 	await dbquery.updateQuery(updateSparql1);
 	await dbquery.updateQuery(updateSparql2);
 }
