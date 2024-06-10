@@ -10,6 +10,7 @@ const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/
 const importFileName = await inquirer.prompt([{"name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName); 
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
+const idBase = "https://aihal.net/accessibility/daf/#";
 
 const data = await getFileData(importDir + importFileName);
 // need to catch bad file name
@@ -46,8 +47,8 @@ const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList,
 
 await findMatrixTypos();
 
-const mappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
-const mappings = expandMappings(metadata);
+const dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
+const expandedMappings = await expandMappings(metadata);
 const referenceTypes = await lookupIdLabels("ReferenceType");
 const tags = await apiGet("tags");
 const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
@@ -65,28 +66,28 @@ if (stmtId != false) {
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
 	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
 	sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
-	mappingIds.forEach(function(mapping) {
-		sparql += ' ; a11y:supports :' + mapping;
+	expandedMappings.forEach(function(mapping) {
+		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
 	tagsArr.forEach(function(tag) {
-		sparql += ' ; a11y:tags :' + getIdByLabel(tags, tag, 'Tag');
+		sparql += ' ; a11y:tags <' + getIdByLabel(tags, tag, 'Tag') + '>';
 	});
 	if (research.length > 0) {
 		research.forEach(function(link) {
 			const linkId = uuid();
-			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType :' + getIdByLabel(referenceTypes, 'research', 'ReferenceType');
+			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
 			sparql += ' . :' + stmtId + ' a11y:references :' + linkId;
 		});
 	}
 	if (guidelines.length > 0) {
 		guidelines.forEach(function(link) {
 			const linkId = uuid();
-			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType :' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType');
-			sparql += ' . :' + stmtId + ' a11y:references :' + linkId;
+			sparql += ' . :' + linkId + ' a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
+			sparql += ' . :' + stmtId + ' a11y:references <' + linkId + '>';
 		});
 	}
 	sparql += ' }';
-	//console.log(sparql);
+	console.log(sparql);
 	const importResult = await dbquery.updateQuery(sparql);
 	console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
@@ -111,7 +112,7 @@ function getIntersectionNeedId(fn1, fn2) {
 		inId = uuid();
 		const label1 = findObjectByProperties(functionalNeedList, {"id": fn1}).label;
 		const label2 = findObjectByProperties(functionalNeedList, {"id": fn2}).label;
-		const update = 'insert data { :' + inId + ' a a11y:IntersectionNeed ; a11y:supports :' + fn1 + ' ; a11y:supports :' + fn2 + ' ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
+		const update = 'insert data { :' + inId + ' a a11y:IntersectionNeed ; a11y:supports <' + fn1 + '> ; a11y:supports <' + fn2 + '> ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
 		dbquery.updateQuery(update);
 	} else {
 		inId = intersection.id;
@@ -120,8 +121,8 @@ function getIntersectionNeedId(fn1, fn2) {
 }
 
 // matrix mappings
-function expandMappings(metadata) {
-	var expandedMappings = new Array();
+async function expandMappings(metadata) {
+	let result = new Array();
 	const mappings = metadata.mappings;
 	
 	mappings.forEach(function(mapping) {
@@ -149,41 +150,33 @@ function expandMappings(metadata) {
 				const userNeedId = getMatrixDimId(userNeed);
 				userNeedRelevances.forEach(function(userNeedRelevance) {
 					const userNeedRelevanceId = getMatrixDimId(userNeedRelevance);
-					expandedMappings.push({[fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId});
+					result.push({[fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId});
 				});
 			});
 		});
 	});
-	return (expandedMappings);
-}
 
-// populate array with ids of mapping objects corresponding to a set of [functional need, user need, relevance]
-async function getMappingIds(mappings) {
-	async function collect() {
-		let promises = new Array();
-		var result = new Array();
-		mappings.forEach(function(mapping) {
-			promises.push(getMappingId(mapping));
-		});
-		return Promise.all(promises);
-	}
-	var results = await collect();
-	return results;
+	result.forEach(async function(mapping) {
+		mapping.id = await getMappingId(mapping);
+	});
+
+	return (result);
 }
 
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
-	var result = findObjectByProperties(mappings, {"fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance});
+	var result = findObjectByProperties(dbMappingIds, {"fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance});
+	console.log(result);
 	if (typeof result === 'undefined') {
 		var mapType = "MatrixMapping";
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
-		const uuid = uuid();
-		const update = 'insert data { :' + uuid + ' a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports :' + functionalNeedId + ' ; a11y:supports :' + mapping.UserNeed + ' ; a11y:supports :' + mapping.UserNeedRelevance + ' }';
+		const id = uuid();
+		const update = 'insert data { :' + id + ' a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
 		await dbquery.updateQuery(update);
-		return (uuid);
+		return (idBase + id);
 	} else {
-		return idFrag(result.id);
+		return result.id;
 	}
 }
 
