@@ -1,5 +1,5 @@
 import {selectQuery} from './dbquery.mjs';
-import {findObjectByProperties} from './util.mjs';
+import {findObjectByProperties, idFrag} from './util.mjs';
 
 export async function getSection(req) {
     const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
@@ -20,6 +20,7 @@ async function lookupTypeList(type, supportsFilter = "") {
 }
 async function lookupTypeId(type, id) { 
     const sparql = "select ?id ?label ?type where { values ?id {:" + id + "} . " + narrowType(type) + " optional {?id rdfs:label ?label} } order by ?label";
+    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
@@ -98,16 +99,26 @@ async function findUserNeedCategories(id) {
 }
 */
 async function findMappingId(id) {
-    const sparql = "select ?id ?applicable ?fnId ?unId ?unrId where { values ?id {:" + id + "} . " + narrowType(type) + " ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id ?applicable ?fnId ?unId ?unrId ?type where { values ?id {:" + id + "} . " + narrowType("Mapping") + " ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
     const val = await selectQuery(sparql);
 
     const stmts = await findStatementList(" ?id a11y:supports :" + id + " . ");
     val[0].statements = stmts;
 
+    const fns = await lookupTypeId("FunctionalNeed", idFrag(val[0].fnId));
+    const ins = await lookupTypeId("IntersectionNeed", idFrag(val[0].fnId));
+    const uns = await lookupTypeId("UserNeed", idFrag(val[0].unId));
+    const uncs = await lookupTypeId("UserNeedRelevance", idFrag(val[0].unrId));
+
+    if (fns.length > 0) val[0].functionalNeed = fns[0];
+    if (ins.length > 0) val[0].intersectionNeed = ins[0];
+    val[0].userNeed = uns[0];
+    val[0].userNeedRelevance = uncs[0];
+
     return val;
 }
 async function findMappingList(type = "Mapping", supportsFilter = "") { 
-    const sparql = "select ?id ?applicable ?stmtId ?fnId ?unId ?unrId where { " + supportsFilter + narrowType(type) + " optional { ?stmtId a11y:supports ?id } . ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id ?applicable ?stmtId ?fnId ?unId ?unrId ?type where { " + supportsFilter + narrowType("Mapping") + " optional { ?stmtId a11y:supports ?id } . ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
     const val = await selectQuery(sparql);
     return val;
 }
