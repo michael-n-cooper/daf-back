@@ -20,7 +20,6 @@ async function lookupTypeList(type, supportsFilter = "") {
 }
 async function lookupTypeId(type, id) { 
     const sparql = "select ?id ?label ?type where { values ?id {:" + id + "} . " + narrowType(type) + " optional {?id rdfs:label ?label} } order by ?label";
-    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
@@ -31,7 +30,7 @@ async function findStatementList(supportsFilter = "") {
     return val;
 }
 async function findStatementId(id) {
-    const sparql = "select distinct ?id ?label ?type ?stmt ?note where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
+    const sparql = "select distinct ?id ?label ?type ?stmt ?note ?contentIRI where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:contentIRI ?contentIRI} . optional { ?id a11y:note ?note} } order by ?label" 
     const val = await selectQuery(sparql);
 
     const refs = await findReferenceList(" :" + id + " a11y:references ?id . ");
@@ -82,7 +81,7 @@ async function findIntersectionNeedList(supportsFilter = "") {
     return val;
 }
 async function findIntersectionNeedId(id) {
-    const sparql = 'select ?id ?label ?type where { values ?id { :' + id + ' } .  bind((a11y:IntersectionNeed) as ?type) . ?id a ?type . optional {?id rdfs:label ?label} } order by ?label'
+    const sparql = 'select ?id ?label where { values ?id { :' + id + ' } . optional {?id rdfs:label ?label} } order by ?label';
     const val = await selectQuery(sparql);
 
     const fns = await findFunctionalNeedList(" :" + id + " a11y:supports ?id . ");
@@ -99,7 +98,7 @@ async function findUserNeedCategories(id) {
 }
 */
 async function findMappingId(id) {
-    const sparql = "select ?id ?applicable ?fnId ?unId ?unrId ?type where { values ?id {:" + id + "} . " + narrowType("Mapping") + " ?id  a11y:supports ?fnId ; a11y:supports ?unId ; a11y:supports ?unrId . { ?fnId a a11y:FunctionalNeed } union { ?fnId a a11y:IntersectionNeed } . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id ?applicable ?fnId ?unId ?unrId ?type where { values ?id {:" + id + "} . " + narrowType("Mapping") + " { ?fnId a a11y:FunctionalNeed . ?id  a11y:supports ?fnId } union { ?fnId a a11y:IntersectionNeed . ?id a11y:supports ?fnId } . ?id a11y:supports ?unId ; a11y:supports ?unrId . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
     const val = await selectQuery(sparql);
 
     const stmts = await findStatementList(" ?id a11y:supports :" + id + " . ");
