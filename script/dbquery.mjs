@@ -4,8 +4,8 @@ prefix owl:		<http://www.w3.org/2002/07/owl#>
 prefix rdf:		<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 prefix rdfs:	<http://www.w3.org/2000/01/rdf-schema#>
 `;
-const selectEndpoint = "http://localhost:7200/repositories/a11y-data";
-const updateEndpoint = "http://localhost:7200/repositories/a11y-data/statements";
+const selectEndpoint = "http://localhost:7200/repositories/daf-data";
+const updateEndpoint = "http://localhost:7200/repositories/daf-data/statements";
 
 export async function selectQuery(sparql) {
 	const post_response = await fetch(selectEndpoint,

@@ -1,6 +1,116 @@
 import {selectQuery} from './dbquery.mjs';
 import {findObjectByProperties, idFrag} from './util.mjs';
 
+const sectionMappings = [
+    { "path": "statements", "type": "AccessibilityStatement", "listFunc": findStatementList, "idFunc": findStatementId },
+    //{ "path": "categories", "type": "Category", "listFunc": find@@List, "idFunc": find@@Id },
+    { "path": "functional-need-categories", "type": "FunctionalNeedCategory", "listFunc": findFunctionalNeedCategoryList, "idFunc": findFunctionalNeedCategoryId },
+    //{ "path": "user-need-categories", "type": "UserNeedCategory", "listFunc": findUserNeedCategoryList, "idFunc": findUserNeedCategoryId },
+    { "path": "mappings", "type": "Mapping", "listFunc": findMappingList, "idFunc": findMappingId },
+    { "path": "intersection-mappings", "type": "IntersectionMapping", "listFunc": findIntersectionMappingList, "idFunc": findIntersectionMappingId },
+    { "path": "matrix-mappings", "type": "MatrixMapping", "listFunc": findMatrixMappingList, "idFunc": findMatrixMappingId },
+    //{ "path": "matrix-dimensions", "type": "MatrixDimension", "listFunc": find@@List, "idFunc": find@@Id },
+    { "path": "functional-needs", "type": "FunctionalNeed", "listFunc": findFunctionalNeedList, "idFunc": findFunctionalNeedId },
+    { "path": "intersection-needs", "type": "IntersectionNeed", "listFunc": findIntersectionNeedList, "idFunc": findIntersectionNeedId },
+    { "path": "user-needs", "type": "UserNeed", "listFunc": findUserNeedList, "idFunc": findUserNeedId },
+    { "path": "user-need-contexts", "type": "UserNeedRelevance", "listFunc": findUserNeedRelevanceList, "idFunc": findUserNeedRelevanceId },
+    { "path": "references", "type": "Reference", "listFunc": findReferenceList, "idFunc": findReferenceId },
+    //{ "path": "term-sets", "type": "TermSet", "listFunc": find@@List, "idFunc": find@@Id },
+    //{ "path": "reference-types", "type": "ReferenceType", "listFunc": find@@List, "idFunc": find@@Id },
+    { "path": "tags", "type": "Tag", "listFunc": findTagList, "idFunc": findTagId },
+    { "path": "ability-accommodation-intersections", "type": "AbilityIntersectionMap", "listFunc": findAbilityAccommodationIntersectionList, "idFunc": findAbilityAccommodationIntersectionId},
+    { "path": "accessibility-characteristics", "type": "AccessibilityCharacteristic", "listFunc": findAccessibilityCharacteristicList, "idFunc": findAccessibilityCharacteristicId },
+    { "path": "accommodation-types", "type": "AccommodationType", "listFunc": findAccommodationTypeList, "idFunc": findAccommodationTypeId },
+    { "path": "curve-categories", "type": "CurveCategory", "listFunc": findCurveCategoryList, "idFunc": findCurveCategoryId },
+    { "path": "functional-abilities", "type": "FunctionalAbility", "listFunc": findFunctionalAbilityList, "idFunc": findFunctionalAbilityId },
+    { "path": "intersection-curve-maps", "type": "FunctionalAbilityCharacteristicMap", "listFunc": findIntersectionCurveMapList, "idFunc": findIntersectionCurveMapId },
+    { "path": "simple-curve-maps", "type": "IntersectionAbilityCharacteristicMap", "listFunc": findSimpleCurveMapList, "idFunc": findSimpleCurveMapId }
+]
+
+async function findAbilityAccommodationIntersectionList(id = null) {
+    let idFilter = "";
+    if (id != null) idFilter = " values ?id { : " + id + " } . ";
+    const sparql = "select ?id ?label ?abilityId ?abilityLabel ?accomId ?accomLabel where { " + idFilter + " ?id a a11y:AccessibilityAccommodationIntersectionMap . optional { ?id rdfs:label ?label } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel .  ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?abilityId rdfs:label ?accomLabel }";
+    const val = await selectQuery(sparql);
+    return val;
+}
+
+async function findAbilityAccommodationIntersectionId(id) {
+    const val = await findAbilityAccommodationIntersectionList(id);
+    return val;
+}
+
+async function findAccessibilityCharacteristicList() {
+    const val = lookupTypeList("AccessibilityCharacteristic");
+    return val;
+}
+
+async function findAccessibilityCharacteristicId(id) {
+    const val = await lookupTypeId("AccessibilityCharacteristic", id);
+    return val;
+}
+
+async function findAccommodationTypeList() {
+    const val = lookupTypeList("AccommodationType");
+    return val;
+}
+
+async function findAccommodationTypeId(id) {
+    const val = await lookupTypeId("AccommodationType", id);
+    return val;
+}
+
+async function findCurveCategoryList() {
+    const val = lookupTypeList("CurveCategory");
+    return val;
+}
+
+async function findCurveCategoryId(id) {
+    const val = await lookupTypeId("CurveCategory", id);
+
+    const members = await lookupTypeList("MatrixDimension", " ?id a11y:supports :" + id + " . ");
+    val[0].members = members;
+
+    return val;
+}
+
+async function findFunctionalAbilityList() {
+    const val = lookupTypeList("FunctionalAbility");
+    return val;
+}
+
+async function findFunctionalAbilityId(id) {
+    const val = await lookupTypeId("FunctionalAbility", id);
+    return val;
+}
+
+async function findIntersectionCurveMapList(id = null) {
+    let idFilter = "";
+    if (id != null) idFilter = " values ?id { : " + id + " } . ";
+    const sparql = "select ?id ?intersectMapId ?charId ?charLabel where { " + idFilter + " ?id a a11y:IntersectionCurveMap . ?id a11y:supports ?intersectMapId . ?intersectMapId a a11y:AbilityAccommodationIntersection . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel }";
+    const val = await selectQuery(sparql);
+    return val;
+}
+
+async function findIntersectionCurveMapId(id) {
+    const val = await findIntersectionCurveMapList(id);
+    return val;
+}
+
+async function findSimpleCurveMapList(id = null) {
+    let idFilter = "";
+    if (id != null) idFilter = " values ?id { : " + id + " } . ";
+    const sparql = "select ?id ?abilityId ?abilityLabel ?accomId ?accomLabel ?charId ?charLabel where { " + idFilter + " ?id a a11y:SimpleCurveMap . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?accomId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel }";
+    const val = await selectQuery(sparql);
+    return val;
+}
+
+async function findSimpleCurveMapId() {
+    const val = await findSimpleCurveMapList(id);
+    return val;
+}
+
+
 export async function getSection(req) {
     const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
     const val = await route.listFunc.call(this);
@@ -46,7 +156,8 @@ async function findStatementId(id) {
 }
 
 async function findCategoryId(id) {
-    return lookupTypeList("Category") 
+    const val = lookupTypeList("Category");
+    return val;
 }
 
 async function findFunctionalNeedCategoryList(supportsFilter = "") { 
@@ -192,23 +303,4 @@ async function findTagId(id) {
 function narrowType(type) {
     return " bind((a11y:" + type + ") as ?mtype) . ?id a ?mtype . ?type ^a ?id filter not exists { ?subtype ^a ?id ; rdfs:subClassOf ?type . filter ( ?subtype != ?type ) } filter( strstarts(str(?type),str(a11y:)) ) .";
 }
-
-const sectionMappings = [
-    { "path": "statements", "type": "AccessibilityStatement", "listFunc": findStatementList, "idFunc": findStatementId },
-    //{ "path": "categories", "type": "Category", "listFunc": find@@List, "idFunc": find@@Id },
-    { "path": "functional-need-categories", "type": "FunctionalNeedCategory", "listFunc": findFunctionalNeedCategoryList, "idFunc": findFunctionalNeedCategoryId },
-    //{ "path": "user-need-categories", "type": "UserNeedCategory", "listFunc": findUserNeedCategoryList, "idFunc": findUserNeedCategoryId },
-    { "path": "mappings", "type": "Mapping", "listFunc": findMappingList, "idFunc": findMappingId },
-    { "path": "intersection-mappings", "type": "IntersectionMapping", "listFunc": findIntersectionMappingList, "idFunc": findIntersectionMappingId },
-    { "path": "matrix-mappings", "type": "MatrixMapping", "listFunc": findMatrixMappingList, "idFunc": findMatrixMappingId },
-    //{ "path": "matrix-dimensions", "type": "MatrixDimension", "listFunc": find@@List, "idFunc": find@@Id },
-    { "path": "functional-needs", "type": "FunctionalNeed", "listFunc": findFunctionalNeedList, "idFunc": findFunctionalNeedId },
-    { "path": "intersection-needs", "type": "IntersectionNeed", "listFunc": findIntersectionNeedList, "idFunc": findIntersectionNeedId },
-    { "path": "user-needs", "type": "UserNeed", "listFunc": findUserNeedList, "idFunc": findUserNeedId },
-    { "path": "user-need-contexts", "type": "UserNeedRelevance", "listFunc": findUserNeedRelevanceList, "idFunc": findUserNeedRelevanceId },
-    { "path": "references", "type": "Reference", "listFunc": findReferenceList, "idFunc": findReferenceId },
-    //{ "path": "term-sets", "type": "TermSet", "listFunc": find@@List, "idFunc": find@@Id },
-    //{ "path": "reference-types", "type": "ReferenceType", "listFunc": find@@List, "idFunc": find@@Id },
-    { "path": "tags", "type": "Tag", "listFunc": findTagList, "idFunc": findTagId }
-]
 
