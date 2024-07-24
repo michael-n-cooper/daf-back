@@ -19,10 +19,11 @@ const sectionMappings = [
     //{ "path": "reference-types", "type": "ReferenceType", "listFunc": find@@List, "idFunc": find@@Id },
     { "path": "tags", "type": "Tag", "listFunc": findTagList, "idFunc": findTagId },
     { "path": "ability-accommodation-intersections", "type": "AbilityIntersectionMap", "listFunc": findAbilityAccommodationIntersectionList, "idFunc": findAbilityAccommodationIntersectionId},
-    { "path": "accessibility-characteristics", "type": "AccessibilityCharacteristic", "listFunc": findAccessibilityCharacteristicList, "idFunc": findAccessibilityCharacteristicId },
     { "path": "accommodation-types", "type": "AccommodationType", "listFunc": findAccommodationTypeList, "idFunc": findAccommodationTypeId },
-    { "path": "curve-categories", "type": "CurveCategory", "listFunc": findCurveCategoryList, "idFunc": findCurveCategoryId },
+    { "path": "accessibility-characteristic-groups", "type": "AccessibilityCharacteristicGroup", "listFunc": findAccessibilityCharacteristicGroupList, "idFunc": findAccessibilityCharacteristicGroupId },
+    { "path": "accessibility-characteristics", "type": "AccessibilityCharacteristic", "listFunc": findAccessibilityCharacteristicList, "idFunc": findAccessibilityCharacteristicId },
     { "path": "functional-abilities", "type": "FunctionalAbility", "listFunc": findFunctionalAbilityList, "idFunc": findFunctionalAbilityId },
+    { "path": "functional-ability-groups", "type": "FunctionalAbilityGroup", "listFunc": findFunctionalAbilityGroupList, "idFunc": findFunctionalAbilityGroupId },
     { "path": "intersection-curve-maps", "type": "FunctionalAbilityCharacteristicMap", "listFunc": findIntersectionCurveMapList, "idFunc": findIntersectionCurveMapId },
     { "path": "simple-curve-maps", "type": "IntersectionAbilityCharacteristicMap", "listFunc": findSimpleCurveMapList, "idFunc": findSimpleCurveMapId }
 ]
@@ -37,6 +38,20 @@ async function findAbilityAccommodationIntersectionList(id = null) {
 
 async function findAbilityAccommodationIntersectionId(id) {
     const val = await findAbilityAccommodationIntersectionList(id);
+    return val;
+}
+
+async function findAccessibilityCharacteristicGroupList() {
+    const val = lookupTypeList("AccessibilityCharacteristicGroup");
+    return val;
+}
+
+async function findAccessibilityCharacteristicGroupId(id) {
+    const val = await lookupTypeId("AccessibilityCharacteristicGroup", id);
+
+    const members = await lookupTypeList("AccessibilityCharacteristic", " ?id a11y:supports :" + id + " . ");
+    val[0].members = members;
+
     return val;
 }
 
@@ -60,15 +75,15 @@ async function findAccommodationTypeId(id) {
     return val;
 }
 
-async function findCurveCategoryList() {
-    const val = lookupTypeList("CurveCategory");
+async function findFunctionalAbilityGroupList() {
+    const val = lookupTypeList("FunctionalAbilityGroup");
     return val;
 }
 
-async function findCurveCategoryId(id) {
-    const val = await lookupTypeId("CurveCategory", id);
+async function findFunctionalAbilityGroupId(id) {
+    const val = await lookupTypeId("FunctionalAbilityGroup", id);
 
-    const members = await lookupTypeList("MatrixDimension", " ?id a11y:supports :" + id + " . ");
+    const members = await lookupTypeList("FunctionalAbility", " ?id a11y:supports :" + id + " . ");
     val[0].members = members;
 
     return val;
