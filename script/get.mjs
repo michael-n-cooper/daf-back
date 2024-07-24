@@ -45,6 +45,10 @@ async function findAbilityAccommodationIntersectionList(id = null) {
     if (id != null) idFilter = " values ?id { : " + id + " } . ";
     const sparql = "select ?id ?label ?abilityId ?abilityLabel ?accomId ?accomLabel where { " + idFilter + " ?id a a11y:AccessibilityAccommodationIntersectionMap . optional { ?id rdfs:label ?label } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel .  ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?abilityId rdfs:label ?accomLabel }";
     const val = await selectQuery(sparql);
+
+    const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
+    val[0].statements = stmts;
+
     return val;
 }
 
@@ -74,6 +78,10 @@ async function findAccessibilityCharacteristicList() {
 
 async function findAccessibilityCharacteristicId(id) {
     const val = await lookupTypeId("AccessibilityCharacteristic", id);
+
+    const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
+    val[0].statements = stmts;
+
     return val;
 }
 
@@ -84,6 +92,10 @@ async function findAccommodationTypeList() {
 
 async function findAccommodationTypeId(id) {
     const val = await lookupTypeId("AccommodationType", id);
+
+    const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
+    val[0].statements = stmts;
+
     return val;
 }
 
@@ -94,10 +106,6 @@ async function findFunctionalAbilityGroupList() {
 
 async function findFunctionalAbilityGroupId(id) {
     const val = await lookupTypeId("FunctionalAbilityGroup", id);
-
-    const members = await lookupTypeList("FunctionalAbility", " ?id a11y:supports :" + id + " . ");
-    val[0].members = members;
-
     return val;
 }
 
@@ -108,6 +116,10 @@ async function findFunctionalAbilityList() {
 
 async function findFunctionalAbilityId(id) {
     const val = await lookupTypeId("FunctionalAbility", id);
+
+    const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
+    val[0].statements = stmts;
+
     return val;
 }
 
