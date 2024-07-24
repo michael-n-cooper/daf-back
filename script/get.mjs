@@ -106,6 +106,10 @@ async function findFunctionalAbilityGroupList() {
 
 async function findFunctionalAbilityGroupId(id) {
     const val = await lookupTypeId("FunctionalAbilityGroup", id);
+
+    const members = await lookupTypeList("FunctionalAbility", " ?id a11y:supports :" + id + " . ");
+    val[0].members = members;
+
     return val;
 }
 
