@@ -28,6 +28,18 @@ const sectionMappings = [
     { "path": "simple-curve-maps", "type": "IntersectionAbilityCharacteristicMap", "listFunc": findSimpleCurveMapList, "idFunc": findSimpleCurveMapId }
 ]
 
+export async function getSection(req) {
+    const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
+    const val = await route.listFunc.call(this);
+    return val;
+}
+
+export async function getId(req) {
+    const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
+    const val = await route.idFunc.call(this, req.params.id);
+    return val;
+}
+
 async function findAbilityAccommodationIntersectionList(id = null) {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { : " + id + " } . ";
@@ -122,19 +134,6 @@ async function findSimpleCurveMapList(id = null) {
 
 async function findSimpleCurveMapId() {
     const val = await findSimpleCurveMapList(id);
-    return val;
-}
-
-
-export async function getSection(req) {
-    const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
-    const val = await route.listFunc.call(this);
-    return val;
-}
-
-export async function getId(req) {
-    const route = findObjectByProperties(sectionMappings, {"path": req.params.section});
-    const val = await route.idFunc.call(this, req.params.id);
     return val;
 }
 
