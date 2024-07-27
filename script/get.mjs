@@ -143,7 +143,7 @@ async function findIntersectionCurveMapId(id) {
 async function findSimpleCurveMapList(id = null) {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { : " + id + " } . ";
-    const sparql = "select ?id ?abilityId ?abilityLabel ?accomId ?accomLabel ?charId ?charLabel where { " + idFilter + " ?id a a11y:SimpleCurveMap . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?accomId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel }";
+    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accomId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + " ?id a a11y:SimpleCurveMap . ?stmtId a AccessibilityStatement . ?stmtId a11y:supports ?id . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?accomId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable }";
     const val = await selectQuery(sparql);
     return val;
 }
