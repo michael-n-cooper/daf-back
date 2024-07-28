@@ -24,8 +24,8 @@ const sectionMappings = [
     { "path": "accessibility-characteristics", "type": "AccessibilityCharacteristic", "listFunc": findAccessibilityCharacteristicList, "idFunc": findAccessibilityCharacteristicId },
     { "path": "functional-abilities", "type": "FunctionalAbility", "listFunc": findFunctionalAbilityList, "idFunc": findFunctionalAbilityId },
     { "path": "functional-ability-groups", "type": "FunctionalAbilityGroup", "listFunc": findFunctionalAbilityGroupList, "idFunc": findFunctionalAbilityGroupId },
-    { "path": "intersection-curve-maps", "type": "FunctionalAbilityCharacteristicMap", "listFunc": findIntersectionCurveMapList, "idFunc": findIntersectionCurveMapId },
-    { "path": "simple-curve-maps", "type": "IntersectionAbilityCharacteristicMap", "listFunc": findSimpleCurveMapList, "idFunc": findSimpleCurveMapId }
+    { "path": "intersection-curve-maps", "type": "IntersectionAbilityCharacteristicMap", "listFunc": findIntersectionCurveMapList, "idFunc": findIntersectionCurveMapId },
+    { "path": "simple-curve-maps", "type": "FunctionalAbilityCharacteristicMap", "listFunc": findSimpleCurveMapList, "idFunc": findSimpleCurveMapId }
 ]
 
 export async function getSection(req) {
@@ -143,7 +143,8 @@ async function findIntersectionCurveMapId(id) {
 async function findSimpleCurveMapList(id = null) {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { : " + id + " } . ";
-    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accomId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + " ?id a a11y:SimpleCurveMap . ?stmtId a AccessibilityStatement . ?stmtId a11y:supports ?id . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?accomId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable }";
+    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accomId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + " ?id a a11y:SimpleCurveMap . ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accomId . ?accomId a a11y:AccommodationType . ?accomId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
+    console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
