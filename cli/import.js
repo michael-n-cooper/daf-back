@@ -42,15 +42,22 @@ const functionalNeedList = await apiGet("functional-needs");
 const intersectionNeedList = await apiGet("intersection-needs");
 const userNeedList = await apiGet("user-needs");
 const userNeedRelevanceList = await apiGet("user-need-contexts");
+const referenceTypes = await lookupIdLabels("ReferenceType");
+const tags = await apiGet("tags");
+const dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
 
-const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedRelevanceList);
+const functionalAbilityList = await apiGet("functional-abilities");
+const accommodationTypeList = await apiGet("accommodation-types");
+const accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
+const simpleCurveMaps = await apiGet("simple-curve-maps")
+
+const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedRelevanceList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
 
 await findMatrixTypos();
 
-const dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
 const expandedMappings = await expandMappings(metadata);
-const referenceTypes = await lookupIdLabels("ReferenceType");
-const tags = await apiGet("tags");
+const expandedAccommtypeMappings = await expandAccommTypeMappings(metadata);
+
 const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
 const { research, guidelines } = retrieveReferences(metadata); // retrieve references, divide into research and guidelines
 const { title, statement, notes } = retrieveContent(content); // retrieve title and statement
@@ -67,6 +74,9 @@ if (stmtId != false) {
 	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
 	sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
 	expandedMappings.forEach(function(mapping) {
+		sparql += ' ; a11y:supports <' + mapping.id + '>';
+	});
+	expandedAccommTypeMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
 	tagsArr.forEach(function(tag) {
@@ -118,6 +128,42 @@ function getIntersectionNeedId(fn1, fn2) {
 		inId = intersection.id;
 	}
 	return inId;
+}
+
+// accommodation type mappings
+async function expandAccomtypeMappings(metadata) {
+	let result = new Array();
+	const mappings = metadata["accomtype-mappings"];
+
+	mappings.forEach(function (mapping) {
+		// check for keyword "all"
+		if (typeof mapping['functional-ability'] === 'string' && compareStr(mapping['functional-ability'], "all")) mapping['functional-ability'] = getOneProp(functionalAbilityList, 'label');
+		if (typeof mapping['accommodation-type'] === 'string' && compareStr(mapping['accommodation-type'], "all")) mapping['accommodation-type'] = getOneProp(accommodationTypeList, 'label');
+		if (typeof mapping['accessibility-characteristic'] === 'string' && compareStr(mapping['accessibility-characteristic'], "all")) mapping['accessibility-characteristic'] = getOneProp(accessibilityCharacteristicList, 'label');
+
+		// make sure the values are arrays
+		const functionalAbilities = (typeof mapping['functional-ability'] === 'string' || (typeof mapping['functional-ability'] === 'object' && !Array.isArray(mapping['functional-ability']))) ? [mapping['functional-ability']] : mapping['functional-ability'];
+		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
+		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
+
+		// expand out arrays of mapped items
+		functionalAbilities.forEach(function (functionalAbility) {
+			const functionalAbilityId = getMatrixDimId(functionalAbility);
+			accommodationTypes.forEach(function (accommodationType) {
+				const accommodationTypeId = getMatrixDimId(accommodationType);
+				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
+					const accessibilityCharacteristicId = getMatrixDimId(accessibilityCharacteristic);
+					result.push({ "functionalAbility": functionalAbilityId, "accommodationType": accommodationTypeId, "accessibilityCharacteristic": accessibilityCharacteristicId });
+				});
+			});
+		});
+	});
+
+	result.forEach(async function (mapping) {
+		mapping.id = await getAccommTypeMappingId(mapping);
+	});
+
+	return (result);
 }
 
 // matrix mappings
@@ -172,6 +218,18 @@ async function getMappingId(mapping) {
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
 		const id = idBase + uuid();
 		const update = 'insert data { <' + id + '> a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
+		await dbquery.updateQuery(update);
+		return (idBase + id);
+	} else {
+		return result.id;
+	}
+}
+
+async function getAccommTypeMappingId(mapping) {
+	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.abilityId, "accommId": mapping.accommId, "charId": mapping.charId });
+	if (typeof result === 'undefined') {
+		const id = idBase + uuid();
+		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
 		await dbquery.updateQuery(update);
 		return (idBase + id);
 	} else {
@@ -360,6 +418,23 @@ async function findMatrixTypos() {
 				checkEach(userNeedList, userNeed);
 				userNeedRelevances.forEach(function(userNeedRelevance) {
 					checkEach(userNeedRelevanceList, userNeedRelevance);
+				});
+			});
+		});
+	});
+
+	const accomTypeMappings = metadata["accomtype-mappings"];
+	accomTypeMappings.forEach(function (mapping) {
+		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
+		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
+		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
+
+		functionalAbilities.forEach(function (functionalAbility) {
+			checkEach(functionalAbilityList, functionalAbility);
+			accommodationTypes.forEach(function (accommodationType) {
+				checkEach(accommodationTypeList, accommodationType);
+				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
+					checkEach(accessibilityCharacteristicList, accessibilityCharacteristic);
 				});
 			});
 		});
