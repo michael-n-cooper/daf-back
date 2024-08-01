@@ -32,7 +32,6 @@ toLoop.forEach(function(un) {
 	});
 });
 sparql += "}";
-console.log(sparql);
 
 
 async function lookupIds(type) {
