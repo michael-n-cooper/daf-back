@@ -1,13 +1,13 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
 import parseMD from 'parse-md';
 import * as dbquery from '../script/dbquery.mjs';
-import {findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet} from '../script/util.mjs';
+import { findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
-const importFileName = await inquirer.prompt([{"name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName); 
+const importFileName = await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
 const idBase = "https://aihal.net/accessibility/daf/#";
@@ -34,10 +34,10 @@ if (data == null) {
 		process.exit(1);
 	}
 }
-
+//#region Load content
 const { metadata, content } = parseMD(data);
 
-const typos = await getTypos();
+const typos = await loadTypos();
 const functionalNeedList = await apiGet("functional-needs");
 const intersectionNeedList = await apiGet("intersection-needs");
 const userNeedList = await apiGet("user-needs");
@@ -50,10 +50,18 @@ const functionalAbilityList = await apiGet("functional-abilities");
 const accommodationTypeList = await apiGet("accommodation-types");
 const accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
 const simpleCurveMaps = await apiGet("simple-curve-maps")
+//#endregion
 
+//#region Process data
 const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedRelevanceList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
 
+const typoCorrectLists = [{"listname": "accommodation-types", "list": accommodationTypeList}, {"listname": "accessibility-characteristics", "list": accessibilityCharacteristicList}, {"listname": "functional-abilities", "list": functionalAbilityList}, {"listname": "functional-needs", "list": functionalNeedList}, {"listname": "intersection-needs", "list": intersectionNeedList}, {"listname": "user-needs", "list": userNeedList}, {"listname": "user-need-contexts", "list": userNeedContextList}];
+var foundTypos = new Array();
+foundTypos.forEach(function (key) {
+	typosObj.push({ key: [] });
+});
 await findMatrixTypos();
+await promptTypoCorrections();
 
 const expandedMappings = await expandMappings(metadata);
 const expandedAccommtypeMappings = await expandAccommTypeMappings(metadata);
@@ -61,11 +69,13 @@ const expandedAccommtypeMappings = await expandAccommTypeMappings(metadata);
 const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
 const { research, guidelines } = retrieveReferences(metadata); // retrieve references, divide into research and guidelines
 const { title, statement, notes } = retrieveContent(content); // retrieve title and statement
+//#endregion
 
+//#region Build sparql
 // check for previous
 let stmtId = await checkReimport(contentIriBase + importFileName);
 if (stmtId != false) {
-	
+
 	// construct the sparql statement
 	if (stmtId == null) stmtId = idBase + uuid();
 	let sparql = 'insert data { <' + stmtId + '> a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
@@ -73,24 +83,24 @@ if (stmtId != false) {
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
 	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
 	sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
-	expandedMappings.forEach(function(mapping) {
+	expandedMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
 	expandedAccommTypeMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
-	tagsArr.forEach(function(tag) {
+	tagsArr.forEach(function (tag) {
 		sparql += ' ; a11y:tags <' + getIdByLabel(tags, tag, 'Tag') + '>';
 	});
 	if (research.length > 0) {
-		research.forEach(function(link) {
+		research.forEach(function (link) {
 			const linkId = idBase + uuid();
 			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
 			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
 		});
 	}
 	if (guidelines.length > 0) {
-		guidelines.forEach(function(link) {
+		guidelines.forEach(function (link) {
 			const linkId = idBase + uuid();
 			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
 			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
@@ -98,30 +108,31 @@ if (stmtId != false) {
 	}
 	sparql += ' }';
 	//console.log(sparql);
-	const importResult = await dbquery.updateQuery(sparql);
-	console.log(JSON.stringify(importResult));
+	//const importResult = await dbquery.updateQuery(sparql);
+	//console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
+//#endregion
 
-// matrix dimensions (functional needs, user needs, relevances)
+//#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(label) {
 	var returnval = null;
-	
+
 	// check against list of known typos, correct
-	label = checkTypo(label);
-	
-	var matrixDimId = findObjectByProperties(knownMatrix, {"label": label});
+	label = correctPotentialTypo(label);
+
+	var matrixDimId = findObjectByProperties(knownMatrix, { "label": label });
 	return matrixDimId.id;
 }
 
 // find an intersection need in the local array from 2 functional need ids
 function getIntersectionNeedId(fn1, fn2) {
 	var inId;
-	const intersection = findObjectByProperties(intersectionNeedList, {"fn1": fn1, "fn2": fn2});
-	
+	const intersection = findObjectByProperties(intersectionNeedList, { "fn1": fn1, "fn2": fn2 });
+
 	if (typeof intersection === 'undefined') {
 		inId = idBase + uuid();
-		const label1 = findObjectByProperties(functionalNeedList, {"id": fn1}).label;
-		const label2 = findObjectByProperties(functionalNeedList, {"id": fn2}).label;
+		const label1 = findObjectByProperties(functionalNeedList, { "id": fn1 }).label;
+		const label2 = findObjectByProperties(functionalNeedList, { "id": fn2 }).label;
 		const update = 'insert data { <' + inId + '> a a11y:IntersectionNeed ; a11y:supports <' + fn1 + '> ; a11y:supports <' + fn2 + '> ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
 		dbquery.updateQuery(update);
 	} else {
@@ -129,7 +140,9 @@ function getIntersectionNeedId(fn1, fn2) {
 	}
 	return inId;
 }
+//#endregion
 
+//#region Mappings
 // accommodation type mappings
 async function expandAccomtypeMappings(metadata) {
 	let result = new Array();
@@ -170,20 +183,20 @@ async function expandAccomtypeMappings(metadata) {
 async function expandMappings(metadata) {
 	let result = new Array();
 	const mappings = metadata.mappings;
-	
-	mappings.forEach(function(mapping) {
+
+	mappings.forEach(function (mapping) {
 		// check for keyword "all"
 		//if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
 		if (typeof mapping['user-need'] === 'string' && compareStr(mapping['user-need'], "all")) mapping['user-need'] = getOneProp(userNeedList, 'label');
 		if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedRelevanceList, 'label');
-	
+
 		// make sure the values are arrays
 		const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
 		const userNeeds = (typeof mapping['user-need'] === 'string') ? [mapping['user-need']] : mapping['user-need'];
 		const userNeedRelevances = (typeof mapping['user-need-relevance'] === 'string') ? [mapping['user-need-relevance']] : mapping['user-need-relevance'];
-		
+
 		// expand out arrays of mapped items
-		functionalNeeds.forEach(function(functionalNeed) {
+		functionalNeeds.forEach(function (functionalNeed) {
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
@@ -192,17 +205,17 @@ async function expandMappings(metadata) {
 				functionalNeedId = getIntersectionNeedId(fn1, fn2);
 				fnType = "IntersectionNeed"
 			} else functionalNeedId = getMatrixDimId(functionalNeed);
-			userNeeds.forEach(function(userNeed) {
+			userNeeds.forEach(function (userNeed) {
 				const userNeedId = getMatrixDimId(userNeed);
-				userNeedRelevances.forEach(function(userNeedRelevance) {
+				userNeedRelevances.forEach(function (userNeedRelevance) {
 					const userNeedRelevanceId = getMatrixDimId(userNeedRelevance);
-					result.push({[fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId});
+					result.push({ [fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId });
 				});
 			});
 		});
 	});
 
-	result.forEach(async function(mapping) {
+	result.forEach(async function (mapping) {
 		mapping.id = await getMappingId(mapping);
 	});
 
@@ -212,7 +225,7 @@ async function expandMappings(metadata) {
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
-	var result = findObjectByProperties(dbMappingIds, {"fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance});
+	var result = findObjectByProperties(dbMappingIds, { "fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance });
 	if (typeof result === 'undefined') {
 		var mapType = "MatrixMapping";
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
@@ -236,22 +249,23 @@ async function getAccommTypeMappingId(mapping) {
 		return result.id;
 	}
 }
+//#endregion
 
-// general
+//#region general
 
 // get the id for a label on a class, add it to the database if not found
 function getIdByLabel(arr, label, addClass) {
 	var id = null;
-	
-	const idObj = findObjectByProperties(arr, {"label": label});
+
+	const idObj = findObjectByProperties(arr, { "label": label });
 	if (typeof idObj !== 'undefined') id = idObj.id;
-	
+
 	if (id == null && addClass !== undefined) {
 		id = idBase + uuid();
 		const updateSparql = 'insert data { <' + id + '> a a11y:' + addClass + ' ; rdfs:label "' + label + '"@en }';
 		dbquery.updateQuery(updateSparql);
 	}
-	
+
 	return id;
 }
 
@@ -261,36 +275,60 @@ async function lookupIdLabels(type) {
 	const sparql = 'select ?id ?label where { ?id a a11y:' + type + ' ; rdfs:label ?label } order by ?label';
 	const results = await dbquery.selectQuery(sparql);
 	if (results.length > 0) {
-		results.forEach(function(result) {
-			returnval.push({id: result.id, label: result.label});
+		results.forEach(function (result) {
+			returnval.push({ id: result.id, label: result.label });
 		});
 	}
 	return returnval;
 }
 
+async function checkReimport(contentIri) {
+	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
+	const result = await dbquery.selectQuery(sparql);
+	if (result.length > 0) {
+		const id = result[0].id;
+		const label = result[0].label;
+		const replace = await inquirer.prompt([{ "type": "confirm", "name": "replace", "message": "Do you want to reimport " + label + "?", }]).then((answer) => answer.replace);
+		if (!replace) return false;
+		else {
+			await deleteStatement(id);
+			return id;
+		}
+	} else return null;
+}
+
+async function deleteStatement(id) {
+	const updateSparql1 = 'delete where { <' + id + '> a11y:references ?s . ?s ?p ?o}';
+	const updateSparql2 = 'delete where { <' + id + '> ?p ?o }';
+	await dbquery.updateQuery(updateSparql1);
+	await dbquery.updateQuery(updateSparql2);
+}
+//#endregion
+
+//#region content
 // references
 function retrieveReferences(metadata) {
 	var research = new Array();
 	var guidelines = new Array();
 	if (metadata.references) {
 		const references = metadata.references;
-		
-		references.forEach(function(referenceType) {
+
+		references.forEach(function (referenceType) {
 			if (referenceType.research !== undefined && Array.isArray(referenceType.research)) {
-				referenceType.research.forEach(function(ref) {
-					if (Array.isArray(ref) && isValidUrl(ref[0])) research.push({"uri": ref[0], "note": ref.slice(1).join(", ")});
+				referenceType.research.forEach(function (ref) {
+					if (Array.isArray(ref) && isValidUrl(ref[0])) research.push({ "uri": ref[0], "note": ref.slice(1).join(", ") });
 				});
 			}
 			if (referenceType.guidelines !== undefined && Array.isArray(referenceType.guidelines)) {
-				referenceType.guidelines.forEach(function(ref) {
-					if (Array.isArray(ref) && isValidUrl(ref[0])) guidelines.push({"uri": ref[0], "note": ref.slice(1).join(", ")});
+				referenceType.guidelines.forEach(function (ref) {
+					if (Array.isArray(ref) && isValidUrl(ref[0])) guidelines.push({ "uri": ref[0], "note": ref.slice(1).join(", ") });
 				});
 			}
 		});
-		
+
 	}
-	
-	return {"research": research, "guidelines": guidelines};
+
+	return { "research": research, "guidelines": guidelines };
 }
 
 // content
@@ -303,7 +341,7 @@ function retrieveContent(content) {
 	let event, node, entering;
 	let title = "";
 	let statement = "";
-	let notes = ""; 
+	let notes = "";
 	let lookingFor = "heading"
 	let inside = "";
 	let pbreak = false;
@@ -361,23 +399,29 @@ function retrieveContent(content) {
 
 	return { "title": normalizeStr(title), "statement": normalizeStr(statement), "notes": notes.trim() };
 }
+//#endregion
 
-// typo handling
+//#region Typo handling
 
 // load list of typs
-async function getTypos() {
+async function loadTypos() {
 	try {
-	  const contents = await readFile(typosPath, { encoding: 'utf8' });
-	  const json = JSON.parse(contents);
-	  return (json);
+		const contents = await readFile(typosPath, { encoding: 'utf8' });
+		let typosObj = JSON.parse(contents);
+
+		typoCorrectLists.forEach(function (list) {
+			if (!findObjectByProperties(list.list, {"listname": list.listname})) typosObj.push({ "listname": [] });
+		});
+		return (typosObj);
 	} catch (err) {
-	  console.error(err.message);
+		console.error(err.message);
 	}
 }
 
 // add a typo to the list
-function storeTypo(inc, cor) {
-	typos.push({incorrect: inc, correct: cor});
+function storeTypo(listname, inc, cor) {
+	let listForTypo = findObjectByProperties(typos, {"listname": listname})
+	listForTypo.push({ incorrect: inc, correct: cor });
 }
 
 // save the list of typos
@@ -385,39 +429,37 @@ async function saveTypos() {
 	try {
 		await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
 	} catch (err) {
-	  console.error(err);
-	} 
+		console.error(err);
+	}
 }
 
 // check if a value is in the list of known typos
-function checkTypo(value) {
-	var typoObj = findObjectByProperties(typos, {"incorrect": value});
+function correctPotentialTypo(listname, value) {
+	let typoList = findObjectByProperties(typos, {"listname": listname});
+	let typoObj = findObjectByProperties(typoList, {"incorrect": value });
 	if (typeof typoObj !== 'undefined') return typoObj.correct;
 	else return value;
 }
 
 // look for potential typos in the yaml mappings
 async function findMatrixTypos() {
-	var incorrects = new Array();
-	var questions = new Array();
-	
 	const mp = metadata.mappings;
-	mp.forEach(function(mapping) {
-	//check for arrays Array.isArray(obj)
-	//handle intersection objects
+	mp.forEach(function (mapping) {
+		//check for arrays Array.isArray(obj)
+		//handle intersection objects
 		const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
 		const userNeeds = (typeof mapping['user-need'] === 'string') ? [mapping['user-need']] : mapping['user-need'];
 		const userNeedRelevances = (typeof mapping['user-need-relevance'] === 'string') ? [mapping['user-need-relevance']] : mapping['user-need-relevance'];
-		
-		functionalNeeds.forEach(function(functionalNeed) {
+
+		functionalNeeds.forEach(function (functionalNeed) {
 			if (typeof functionalNeed === 'object') {
-				checkEach(functionalNeedList, functionalNeed.intersection[0]);
-				checkEach(functionalNeedList, functionalNeed.intersection[1]);
-			} else checkEach(functionalNeedList, functionalNeed);
-			userNeeds.forEach(function(userNeed) {
-				checkEach(userNeedList, userNeed);
-				userNeedRelevances.forEach(function(userNeedRelevance) {
-					checkEach(userNeedRelevanceList, userNeedRelevance);
+				checkPotentialTypo(functionalNeedList, functionalNeed.intersection[0]);
+				checkPotentialTypo(functionalNeedList, functionalNeed.intersection[1]);
+			} else checkPotentialTypo(functionalNeedList, functionalNeed);
+			userNeeds.forEach(function (userNeed) {
+				checkPotentialTypo(userNeedList, userNeed);
+				userNeedRelevances.forEach(function (userNeedRelevance) {
+					checkPotentialTypo(userNeedRelevanceList, userNeedRelevance);
 				});
 			});
 		});
@@ -430,77 +472,62 @@ async function findMatrixTypos() {
 		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
 
 		functionalAbilities.forEach(function (functionalAbility) {
-			checkEach(functionalAbilityList, functionalAbility);
+			checkPotentialTypo("functionalAbilityList", functionalAbility);
 			accommodationTypes.forEach(function (accommodationType) {
-				checkEach(accommodationTypeList, accommodationType);
+				checkPotentialTypo("accommodationTypeList", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					checkEach(accessibilityCharacteristicList, accessibilityCharacteristic);
+					checkPotentialTypo("accessibilityCharacteristicList", accessibilityCharacteristic);
 				});
 			});
 		});
 	});
-	
-	function checkEach(list, label) {
-		if (!compareStr(label, 'all')) {
-			if (typeof findObjectByProperties(list, {"label": label}) === 'undefined' && typeof findObjectByProperties(typos, {"incorrect": label}) === 'undefined') {
-				incorrects.push([label, list]);
-			}
-		}
+
+}
+
+function checkPotentialTypo(listname, label) {
+	let typoList = findObjectByProperties(typoCorrectLists, {"listname": listname});
+	let typoCorrectedList = findObjectByProperties(typoList, {"listname": listname});
+	if (typeof findObjectByProperties(typoList, { "label": label }) === 'undefined' && typeof findObjectByProperties(typoCorrectedList, { "incorrect": label }) === 'undefined') {
+		foundTypos.push({"listname": listname, "incorrect": label});
 	}
-		
-	//todo: remove duplicates from the array before proceeding
-	if (incorrects.length > 0) {
-		incorrects.forEach(function(inc, index) {
-			questions.push(makeInquirerQuestion("q" + index, inc[0], inc[1]));
+}
+
+async function promptTypoCorrections() {
+	let questions = new Array();
+	let questionLists = new Array();
+
+	foundTypos.forEach(function(typoList) {
+		typoList.forEach(function (typo, index) {
+			let qid = "q" + index;
+			questionLists[qid] = typoList.listname;
+			questions.push(makeInquirerQuestion(qid, typo.incorrect, typo.list));
 		});
-	
-		const answers = await inquirer.prompt(questions).then((answers) => answers);
-		for (var i = 0; i < questions.length; i++) {
-			typos.push({"incorrect": incorrects[i][0], "correct": answers["q"+i]});
-		}
-		
-		writeFile(typosPath, JSON.stringify(typos));
+	});
+
+	const answers = await inquirer.prompt(questions).then((answers) => answers);
+	for (var i = 0; i < questions.length; i++) {
+		let qid = "q" + i;
+		let listname = questionLists[qid];
+		storeTypo(listname, answers[qid]);
 	}
+
+	saveTypos();
 }
 
-// send typos to the inquirer prompt
-async function promptTypoCorrections(questions) {
-	await inquirer.prompt(questions).then((answer) => {
-		return answer;
-  	});
-}
+//#endregion
 
+//#region Inquirer
 // inquirer
-function makeInquirerQuestion(qId, label, arr) {
+function makeInquirerQuestion(qId, label, list) {
+	let arr = eval(list);
 	var q = {
-    	type: "rawlist",
-    	name: qId,
-    	message: "Unable to find '" + label + "'. Please select the correct item from the list.",
-    	choices: getOneProp(arr, 'label'),
-    	waitUserInput: true,
-    	loop: false
-  };
-  return q;
+		type: "rawlist",
+		name: qId,
+		message: "Unable to find '" + label + "'. Please select the correct item from the list.",
+		choices: getOneProp(arr, 'label'),
+		waitUserInput: true,
+		loop: false
+	};
+	return q;
 }
-
-async function checkReimport(contentIri) {
-	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
-	const result = await dbquery.selectQuery(sparql);
-	if (result.length > 0) {
-		const id = result[0].id;
-		const label = result[0].label;
-		const replace = await inquirer.prompt([{"type": "confirm", "name": "replace", "message": "Do you want to reimport " + label + "?", }]).then((answer) => answer.replace); 
-		if (!replace) return false;
-		else {
-			await deleteStatement(id);
-			return id;
-		}
-	} else return null;
-}
-
-async function deleteStatement(id) {
-	const updateSparql1 = 'delete where { <' + id + '> a11y:references ?s . ?s ?p ?o}';
-	const updateSparql2 = 'delete where { <' + id + '> ?p ?o }';
-	await dbquery.updateQuery(updateSparql1);
-	await dbquery.updateQuery(updateSparql2);
-}
+//#endregion
