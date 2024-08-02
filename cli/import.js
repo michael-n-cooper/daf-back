@@ -1,7 +1,7 @@
-import { readFile, writeFile, open } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import parseMD from 'parse-md';
 import * as dbquery from '../script/dbquery.mjs';
-import { findObjectByProperties, filterObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
+import { findObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
@@ -41,7 +41,7 @@ const typos = await loadTypos();
 const functionalNeedList = await apiGet("functional-needs");
 const intersectionNeedList = await apiGet("intersection-needs");
 const userNeedList = await apiGet("user-needs");
-const userNeedRelevanceList = await apiGet("user-need-contexts");
+const userNeedContextList = await apiGet("user-need-contexts");
 const referenceTypes = await lookupIdLabels("ReferenceType");
 const tags = await apiGet("tags");
 const dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
@@ -53,18 +53,15 @@ const simpleCurveMaps = await apiGet("simple-curve-maps")
 //#endregion
 
 //#region Process data
-const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedRelevanceList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
+const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
 
 const typoCorrectLists = [{"listname": "accommodation-types", "list": accommodationTypeList}, {"listname": "accessibility-characteristics", "list": accessibilityCharacteristicList}, {"listname": "functional-abilities", "list": functionalAbilityList}, {"listname": "functional-needs", "list": functionalNeedList}, {"listname": "intersection-needs", "list": intersectionNeedList}, {"listname": "user-needs", "list": userNeedList}, {"listname": "user-need-contexts", "list": userNeedContextList}];
 var foundTypos = new Array();
-foundTypos.forEach(function (key) {
-	typosObj.push({ key: [] });
-});
 await findMatrixTypos();
 await promptTypoCorrections();
 
 const expandedMappings = await expandMappings(metadata);
-const expandedAccommtypeMappings = await expandAccommTypeMappings(metadata);
+const expandedAccommtypeMappings = await expandAccomtypeMappings(metadata);
 
 const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
 const { research, guidelines } = retrieveReferences(metadata); // retrieve references, divide into research and guidelines
@@ -86,7 +83,7 @@ if (stmtId != false) {
 	expandedMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
-	expandedAccommTypeMappings.forEach(function (mapping) {
+	expandedAccommtypeMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
 	tagsArr.forEach(function (tag) {
@@ -115,8 +112,6 @@ if (stmtId != false) {
 
 //#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(label) {
-	var returnval = null;
-
 	// check against list of known typos, correct
 	label = correctPotentialTypo(label);
 
@@ -188,7 +183,7 @@ async function expandMappings(metadata) {
 		// check for keyword "all"
 		//if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
 		if (typeof mapping['user-need'] === 'string' && compareStr(mapping['user-need'], "all")) mapping['user-need'] = getOneProp(userNeedList, 'label');
-		if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedRelevanceList, 'label');
+		if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedContextList, 'label');
 
 		// make sure the values are arrays
 		const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
@@ -242,7 +237,7 @@ async function getAccommTypeMappingId(mapping) {
 	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.abilityId, "accommId": mapping.accommId, "charId": mapping.charId });
 	if (typeof result === 'undefined') {
 		const id = idBase + uuid();
-		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
+		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
 		await dbquery.updateQuery(update);
 		return (idBase + id);
 	} else {
@@ -459,7 +454,7 @@ async function findMatrixTypos() {
 			userNeeds.forEach(function (userNeed) {
 				checkPotentialTypo(userNeedList, userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					checkPotentialTypo(userNeedRelevanceList, userNeedRelevance);
+					checkPotentialTypo(userNeedContextList, userNeedRelevance);
 				});
 			});
 		});
