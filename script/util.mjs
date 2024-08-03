@@ -3,16 +3,16 @@ import { readFile, writeFile, open } from 'node:fs/promises';
 
 // Function to find an object based on multiple properties
 export function findObjectByProperties(array, properties) {
-  return array.find(obj => {
-    // Check if all specified properties match
-    return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
-  });
+	return array.find(obj => {
+		// Check if all specified properties match
+		return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
+	});
 }
 export function filterObjectByProperties(array, properties) {
-  return array.filter(obj => {
-    // Check if all specified properties match
-    return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
-  });
+	return array.filter(obj => {
+		// Check if all specified properties match
+		return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
+	});
 }
 
 export function idFrag(uri) {
@@ -30,13 +30,13 @@ export function normalizeStr(str) {
 
 // from https://www.freecodecamp.org/news/check-if-a-javascript-string-is-a-url/
 export function isValidUrl(urlString) {
-  	var urlPattern = new RegExp('^(https?:\\/\\/)?'+ // validate protocol
-    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // validate domain name
-    '((\\d{1,3}\\.){3}\\d{1,3}))'+ // validate OR ip (v4) address
-    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // validate port and path
-    '(\\?[;&a-z\\d%_.~+=-]*)?'+ // validate query string
-    '(\\#[-a-z\\d_]*)?$','i'); // validate fragment locator
-  return !!urlPattern.test(urlString);
+	var urlPattern = new RegExp('^(https?:\\/\\/)?' + // validate protocol
+		'((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // validate domain name
+		'((\\d{1,3}\\.){3}\\d{1,3}))' + // validate OR ip (v4) address
+		'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // validate port and path
+		'(\\?[;&a-z\\d%_.~+=-]*)?' + // validate query string
+		'(\\#[-a-z\\d_]*)?$', 'i'); // validate fragment locator
+	return !!urlPattern.test(urlString);
 }
 
 export function getOneProp(arr, prop) {
@@ -47,11 +47,11 @@ export function getOneProp(arr, prop) {
 
 export async function getFileData(path) {
 	try {
-	  const contents = await readFile(path, { encoding: 'utf8' });
-	  return (contents);
+		const contents = await readFile(path, { encoding: 'utf8' });
+		return (contents);
 	} catch (err) {
-	  //console.error(err.message);
-	  return null;
+		//console.error(err.message);
+		return null;
 	}
 }
 
@@ -70,7 +70,7 @@ export function mdToHtml(str) {
 }
 
 export async function apiGet(path) {
-	const data = await fetch ("http://localhost:3000/api/" + path);
+	const data = await fetch("http://localhost:3000/api/" + path);
 	const json = await data.json();
 	return json;
 }
