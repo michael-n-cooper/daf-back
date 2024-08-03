@@ -7,10 +7,10 @@ import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
-const importFileName = await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
+const importFileName = 'input-modality-choice.md';//await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
-const idBase = "https://aihal.net/accessibility/daf/#";
+const idBase = "https://github.com/michael-n-cooper/a11y-data/daf/#";
 
 const data = await getFileData(importDir + importFileName);
 // need to catch bad file name
@@ -23,7 +23,10 @@ if (data == null) {
 		const message = "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?";
 		const todel = await inquirer.prompt([{ "name": "todel", "type": "confirm", "message": message, }]).then((answer) => answer.todel);
 		if (todel) {
-			deleteStatement(idFrag(result[0].id));
+			/**
+			 * uncomment this when ready
+			 */
+			//deleteStatement(idFrag(result[0].id));
 			console.log("Deleted " + importFileName);
 		} else console.log("Aborting");
 		process.exit(0);
@@ -37,7 +40,6 @@ if (data == null) {
 //#region Load content
 const { metadata, content } = parseMD(data);
 
-const typos = await loadTypos();
 const functionalNeedList = await apiGet("functional-needs");
 const intersectionNeedList = await apiGet("intersection-needs");
 const userNeedList = await apiGet("user-needs");
@@ -52,13 +54,16 @@ const accessibilityCharacteristicList = await apiGet("accessibility-characterist
 const simpleCurveMaps = await apiGet("simple-curve-maps")
 //#endregion
 
-//#region Process data
-const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
-
-const typoCorrectLists = [{"listname": "accommodation-types", "list": accommodationTypeList}, {"listname": "accessibility-characteristics", "list": accessibilityCharacteristicList}, {"listname": "functional-abilities", "list": functionalAbilityList}, {"listname": "functional-needs", "list": functionalNeedList}, {"listname": "intersection-needs", "list": intersectionNeedList}, {"listname": "user-needs", "list": userNeedList}, {"listname": "user-need-contexts", "list": userNeedContextList}];
+//#region process typos
+const typoCorrectLists = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
+const typos = await loadTypos();
 var foundTypos = new Array();
 await findMatrixTypos();
 await promptTypoCorrections();
+//#endregion
+
+//#region Process data
+const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
 
 const expandedMappings = await expandMappings(metadata);
 const expandedAccommtypeMappings = await expandAccomtypeMappings(metadata);
@@ -405,7 +410,7 @@ async function loadTypos() {
 		let typosObj = JSON.parse(contents);
 
 		typoCorrectLists.forEach(function (list) {
-			if (!findObjectByProperties(list.list, {"listname": list.listname})) typosObj.push({ "listname": [] });
+			if (!findObjectByProperties(list.list, { "listname": list.listname })) typosObj.push({ "listname": [] });
 		});
 		return (typosObj);
 	} catch (err) {
@@ -415,7 +420,7 @@ async function loadTypos() {
 
 // add a typo to the list
 function storeTypo(listname, inc, cor) {
-	let listForTypo = findObjectByProperties(typos, {"listname": listname})
+	let listForTypo = findObjectByProperties(typos, { "listname": listname })
 	listForTypo.push({ incorrect: inc, correct: cor });
 }
 
@@ -430,8 +435,8 @@ async function saveTypos() {
 
 // check if a value is in the list of known typos
 function correctPotentialTypo(listname, value) {
-	let typoList = findObjectByProperties(typos, {"listname": listname});
-	let typoObj = findObjectByProperties(typoList, {"incorrect": value });
+	let typoList = findObjectByProperties(typos, { "listname": listname });
+	let typoObj = findObjectByProperties(typoList, { "incorrect": value });
 	if (typeof typoObj !== 'undefined') return typoObj.correct;
 	else return value;
 }
@@ -448,13 +453,13 @@ async function findMatrixTypos() {
 
 		functionalNeeds.forEach(function (functionalNeed) {
 			if (typeof functionalNeed === 'object') {
-				checkPotentialTypo(functionalNeedList, functionalNeed.intersection[0]);
-				checkPotentialTypo(functionalNeedList, functionalNeed.intersection[1]);
-			} else checkPotentialTypo(functionalNeedList, functionalNeed);
+				checkPotentialTypo("functional-needs", functionalNeed.intersection[0]);
+				checkPotentialTypo("functional-needs", functionalNeed.intersection[1]);
+			} else checkPotentialTypo("functional-needs", functionalNeed);
 			userNeeds.forEach(function (userNeed) {
-				checkPotentialTypo(userNeedList, userNeed);
+				checkPotentialTypo("user-needs", userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					checkPotentialTypo(userNeedContextList, userNeedRelevance);
+					checkPotentialTypo("user-need-contexts", userNeedRelevance);
 				});
 			});
 		});
@@ -467,11 +472,11 @@ async function findMatrixTypos() {
 		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
 
 		functionalAbilities.forEach(function (functionalAbility) {
-			checkPotentialTypo("functionalAbilityList", functionalAbility);
+			checkPotentialTypo("functional-abilities", functionalAbility);
 			accommodationTypes.forEach(function (accommodationType) {
-				checkPotentialTypo("accommodationTypeList", accommodationType);
+				checkPotentialTypo("accommodation-types", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					checkPotentialTypo("accessibilityCharacteristicList", accessibilityCharacteristic);
+					checkPotentialTypo("accessibility-characteristics", accessibilityCharacteristic);
 				});
 			});
 		});
@@ -480,18 +485,21 @@ async function findMatrixTypos() {
 }
 
 function checkPotentialTypo(listname, label) {
-	let typoList = findObjectByProperties(typoCorrectLists, {"listname": listname});
-	let typoCorrectedList = findObjectByProperties(typoList, {"listname": listname});
-	if (typeof findObjectByProperties(typoList, { "label": label }) === 'undefined' && typeof findObjectByProperties(typoCorrectedList, { "incorrect": label }) === 'undefined') {
-		foundTypos.push({"listname": listname, "incorrect": label});
+	let found = false;
+	let typoList = findObjectByProperties(typoCorrectLists, { "listname": listname });
+	if (typeof findObjectByProperties(typoList, { "label": label }) === 'undefined') found = true;
+	let typoCorrectedList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
+	if (typeof typoCorrectedList !== 'undefined') {
+		if (typeof findObjectByProperties(typoCorrectedList, { "incorrect": label }) === 'undefined') found = true;
 	}
+	if (found) foundTypos.push({ "listname": listname, "incorrect": label });
 }
 
 async function promptTypoCorrections() {
 	let questions = new Array();
 	let questionLists = new Array();
 
-	foundTypos.forEach(function(typoList) {
+	foundTypos.forEach(function (typoList) {
 		typoList.forEach(function (typo, index) {
 			let qid = "q" + index;
 			questionLists[qid] = typoList.listname;
