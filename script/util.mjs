@@ -13,7 +13,9 @@ export function findObjectByProperties(array, properties) {
 export function filterObjectByProperties(array, properties) {
 	return array.filter(obj => {
 		// Check if all specified properties match
-		return Object.getOwnPropertyNames(properties).every(key => compareStr(obj[key], properties[key]));
+		return Object.getOwnPropertyNames(properties).every(key => {
+			if (compareStr(obj[key], properties[key])) return obj;
+		});
 	});
 }
 
