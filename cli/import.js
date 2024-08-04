@@ -52,10 +52,13 @@ const functionalAbilityList = await apiGet("functional-abilities");
 const accommodationTypeList = await apiGet("accommodation-types");
 const accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
 const simpleCurveMaps = await apiGet("simple-curve-maps")
+
+const knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
+writeFile("./matrix.json", JSON.stringify(knownMatrix))
+
 //#endregion
 
 //#region process typos
-const typoCorrectLists = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
 const typos = await loadTypos();
 var foundTypos = new Array();
 await findMatrixTypos();
@@ -63,8 +66,6 @@ await promptTypoCorrections();
 //#endregion
 
 //#region Process data
-const knownMatrix = new Array().concat(functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList);
-
 const expandedMappings = await expandMappings(metadata);
 const expandedAccommtypeMappings = await expandAccomtypeMappings(metadata);
 
@@ -116,12 +117,19 @@ if (stmtId != false) {
 //#endregion
 
 //#region matrix dimensions (functional needs, user needs, relevances)
-function getMatrixDimId(label) {
+function getMatrixDimId(listname, label) {
+	console.log(listname + ", " + label)
+	//console.log(knownMatrix)
 	// check against list of known typos, correct
-	label = correctPotentialTypo(label);
+	//label = correctPotentialTypo(listname, label);
 
-	var matrixDimId = findObjectByProperties(knownMatrix, { "label": label });
-	return matrixDimId.id;
+	let matrixListObj = findObjectByProperties(knownMatrix, { "listname": listname });
+	console.log(matrixListObj);
+	if (typeof matrixListObj !== 'undefined') {
+		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": label });
+		console.log(matrixDimId);
+		return matrixDimId.id;
+	} else return null;
 }
 
 // find an intersection need in the local array from 2 functional need ids
@@ -161,11 +169,11 @@ async function expandAccomtypeMappings(metadata) {
 
 		// expand out arrays of mapped items
 		functionalAbilities.forEach(function (functionalAbility) {
-			const functionalAbilityId = getMatrixDimId(functionalAbility);
+			const functionalAbilityId = getMatrixDimId("functional-abilities", functionalAbility);
 			accommodationTypes.forEach(function (accommodationType) {
-				const accommodationTypeId = getMatrixDimId(accommodationType);
+				const accommodationTypeId = getMatrixDimId("accommodation-types", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					const accessibilityCharacteristicId = getMatrixDimId(accessibilityCharacteristic);
+					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", accessibilityCharacteristic);
 					result.push({ "functionalAbility": functionalAbilityId, "accommodationType": accommodationTypeId, "accessibilityCharacteristic": accessibilityCharacteristicId });
 				});
 			});
@@ -183,10 +191,11 @@ async function expandAccomtypeMappings(metadata) {
 async function expandMappings(metadata) {
 	let result = new Array();
 	const mappings = metadata.mappings;
+	console.log(mappings);
 
 	mappings.forEach(function (mapping) {
 		// check for keyword "all"
-		//if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
+		if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
 		if (typeof mapping['user-need'] === 'string' && compareStr(mapping['user-need'], "all")) mapping['user-need'] = getOneProp(userNeedList, 'label');
 		if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedContextList, 'label');
 
@@ -197,18 +206,20 @@ async function expandMappings(metadata) {
 
 		// expand out arrays of mapped items
 		functionalNeeds.forEach(function (functionalNeed) {
+			console.log(functionalNeed);
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
-				const fn1 = getMatrixDimId(functionalNeed.intersection[0]);
-				const fn2 = getMatrixDimId(functionalNeed.intersection[1]);
+				const fn1 = getMatrixDimId("functional-needs", functionalNeed.intersection[0]);
+				const fn2 = getMatrixDimId("functional-needs", functionalNeed.intersection[1]);
 				functionalNeedId = getIntersectionNeedId(fn1, fn2);
 				fnType = "IntersectionNeed"
-			} else functionalNeedId = getMatrixDimId(functionalNeed);
+			} else functionalNeedId = getMatrixDimId("functional-needs", functionalNeed);
+			console.log(functionalNeedId);
 			userNeeds.forEach(function (userNeed) {
-				const userNeedId = getMatrixDimId(userNeed);
+				const userNeedId = getMatrixDimId("user-needs", userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					const userNeedRelevanceId = getMatrixDimId(userNeedRelevance);
+					const userNeedRelevanceId = getMatrixDimId("user-need-contexts", userNeedRelevance);
 					result.push({ [fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId });
 				});
 			});
@@ -224,6 +235,7 @@ async function expandMappings(metadata) {
 
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
+	//console.log(mapping);
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
 	var result = findObjectByProperties(dbMappingIds, { "fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance });
 	if (typeof result === 'undefined') {
@@ -409,12 +421,14 @@ async function loadTypos() {
 		const contents = await readFile(typosPath, { encoding: 'utf8' });
 		let typosObj = JSON.parse(contents);
 
-		typoCorrectLists.forEach(function (list) {
-			if (!findObjectByProperties(list.list, { "listname": list.listname })) typosObj.push({ "listname": [] });
+		/*
+		knownMatrix.forEach(function (list) {
+			if (!findObjectByProperties(typos, { "listname": list.listname })) typosObj.push({ "listname": [] });
 		});
+		*/
 		return (typosObj);
 	} catch (err) {
-		console.error(err.message);
+		console.error("loadTypos: " + err.message);
 	}
 }
 
@@ -427,7 +441,7 @@ function storeTypo(listname, inc, cor) {
 // save the list of typos
 async function saveTypos() {
 	try {
-		await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
+		//await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
 	} catch (err) {
 		console.error(err);
 	}
@@ -436,8 +450,10 @@ async function saveTypos() {
 // check if a value is in the list of known typos
 function correctPotentialTypo(listname, value) {
 	let typoList = findObjectByProperties(typos, { "listname": listname });
-	let typoObj = findObjectByProperties(typoList, { "incorrect": value });
-	if (typeof typoObj !== 'undefined') return typoObj.correct;
+	if (typeof typoList !== 'undefined') {
+		let typoObj = findObjectByProperties(typoList, { "incorrect": value });
+		if (typeof typoObj !== 'undefined') return typoObj.correct;
+	}
 	else return value;
 }
 
@@ -486,12 +502,13 @@ async function findMatrixTypos() {
 
 function checkPotentialTypo(listname, label) {
 	let found = false;
-	let typoList = findObjectByProperties(typoCorrectLists, { "listname": listname });
-	if (typeof findObjectByProperties(typoList, { "label": label }) === 'undefined') found = true;
+	// check for known typo, get sublist then check that
+	let typoList = findObjectByProperties(knownMatrix, { "listname": listname });
+	if (typeof typoList !== 'undefined' && typeof findObjectByProperties(typoList.list, { "label": label }) === 'undefined') found = true;
+	// check for already checked typo
 	let typoCorrectedList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
-	if (typeof typoCorrectedList !== 'undefined') {
-		if (typeof findObjectByProperties(typoCorrectedList, { "incorrect": label }) === 'undefined') found = true;
-	}
+	if (typeof typoCorrectedList !== 'undefined') found = true;
+
 	if (found) foundTypos.push({ "listname": listname, "incorrect": label });
 }
 
@@ -499,12 +516,10 @@ async function promptTypoCorrections() {
 	let questions = new Array();
 	let questionLists = new Array();
 
-	foundTypos.forEach(function (typoList) {
-		typoList.forEach(function (typo, index) {
-			let qid = "q" + index;
-			questionLists[qid] = typoList.listname;
-			questions.push(makeInquirerQuestion(qid, typo.incorrect, typo.list));
-		});
+	foundTypos.forEach(function (typo, index) {
+		let qid = "q" + index;
+		questionLists[qid] = typo.listname;
+		questions.push(makeInquirerQuestion(qid, typo.incorrect, typo.listname));
 	});
 
 	const answers = await inquirer.prompt(questions).then((answers) => answers);
@@ -521,8 +536,9 @@ async function promptTypoCorrections() {
 
 //#region Inquirer
 // inquirer
-function makeInquirerQuestion(qId, label, list) {
-	let arr = eval(list);
+function makeInquirerQuestion(qId, label, listname) {
+
+	let arr = findObjectByProperties(knownMatrix, { "listname": listname }).list;
 	var q = {
 		type: "rawlist",
 		name: qId,

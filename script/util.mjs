@@ -5,13 +5,16 @@ import { readFile, writeFile, open } from 'node:fs/promises';
 export function findObjectByProperties(array, properties) {
 	return array.find(obj => {
 		// Check if all specified properties match
-		return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
+		return Object.getOwnPropertyNames(properties).every(key => {
+			console.log(key + " ; obj: " + obj[key] + " ; prop: " + properties[key])
+			if (compareStr(obj[key], properties[key])) return obj;
+		});
 	});
 }
 export function filterObjectByProperties(array, properties) {
 	return array.filter(obj => {
 		// Check if all specified properties match
-		return Object.keys(properties).every(key => compareStr(obj[key], properties[key]));
+		return Object.getOwnPropertyNames(properties).every(key => compareStr(obj[key], properties[key]));
 	});
 }
 
