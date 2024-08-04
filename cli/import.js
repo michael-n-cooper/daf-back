@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import parseMD from 'parse-md';
 import * as dbquery from '../script/dbquery.mjs';
-import { findObjectByProperties, idFrag, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
+import { findObjectByProperties, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';

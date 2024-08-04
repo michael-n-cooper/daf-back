@@ -218,7 +218,7 @@ async function findFunctionalNeedId(id) {
     return val;
 }
 async function findIntersectionNeedList(supportsFilter = "") {
-    const sparql = 'select ?id ?label ?fn1 ?fn2 where { ?id a a11y:IntersectionNeed ; a11y:supports ?fn1 ; a11y:supports ?fn2 . filter (!sameterm(?fn1, ?fn2)) . optional { ?id rdfs:label ?label } }';
+    const sparql = 'select ?id ?label ?fn1 ?fn2 where {' + supportsFilter + narrowType("IntersectionNeed") + ' ?id a11y:supports ?fn1 ; a11y:supports ?fn2 . filter (!sameterm(?fn1, ?fn2)) . optional { ?id rdfs:label ?label } }';
     const val = await selectQuery(sparql);
     return val;
 }
@@ -289,7 +289,7 @@ async function findUserNeedId(id) {
     return val;
 }
 
-async function findUserNeedRelevanceList(id) { 
+async function findUserNeedRelevanceList() { 
     return lookupTypeList("UserNeedRelevance")
 }
 async function findUserNeedRelevanceId(id) { 
@@ -310,12 +310,6 @@ async function findReferenceList(supportsFilter = "") {
     const sparql = "select ?id ?label ?type ?refType ?refIRI ?refNote ?stmtId ?stmtLabel where {" + supportsFilter + narrowType("Reference") + " ?id a11y:refType ?rt . ?rt rdfs:label ?refType . ?id a11y:refIRI ?refIRI . ?stmtId a11y:references ?id . ?stmtId rdfs:label ?stmtLabel . optional {?id a11y:refNote ?refNote} . optional {?id rdfs:label ?label} } order by ?refIRI";
     const val = await selectQuery(sparql);
     return val;
-}
-async function findTermList(id) { 
-    return lookupTypeList("Term") 
-}
-async function findReferenceTypeList(id) {
-    return lookupTypeList("ReferenceType") 
 }
 async function findTagList(supportsFilter = "") { 
     const sparql = "select ?id ?label ?type where {" + supportsFilter + narrowType("Tag") + " optional {?id rdfs:label ?label} } order by ?label";

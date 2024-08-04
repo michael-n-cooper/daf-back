@@ -1,5 +1,5 @@
-import { readFile, writeFile, open } from 'node:fs/promises';
-//import * as commonmark from 'commonmark';
+import { readFile } from 'node:fs/promises';
+import * as commonmark from 'commonmark';
 
 // Function to find an object based on multiple properties
 export function findObjectByProperties(array, properties) {
@@ -55,7 +55,7 @@ export async function getFileData(path) {
 		const contents = await readFile(path, { encoding: 'utf8' });
 		return (contents);
 	} catch (err) {
-		//console.error(err.message);
+		console.error(err.message);
 		return null;
 	}
 }
