@@ -110,7 +110,7 @@ if (stmtId != false) {
 		});
 	}
 	sparql += ' }';
-	//console.log(sparql);
+	console.log(sparql);
 	//const importResult = await dbquery.updateQuery(sparql);
 	//console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
@@ -118,16 +118,16 @@ if (stmtId != false) {
 
 //#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(listname, label) {
-	console.log(listname + ", " + label)
-	//console.log(knownMatrix)
 	// check against list of known typos, correct
+
+	/**
+	 * uncomment this
+	 */
 	//label = correctPotentialTypo(listname, label);
 
 	let matrixListObj = findObjectByProperties(knownMatrix, { "listname": listname });
-	console.log(matrixListObj);
 	if (typeof matrixListObj !== 'undefined') {
 		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": label });
-		console.log(matrixDimId);
 		return matrixDimId.id;
 	} else return null;
 }
@@ -191,8 +191,7 @@ async function expandAccomtypeMappings(metadata) {
 async function expandMappings(metadata) {
 	let result = new Array();
 	const mappings = metadata.mappings;
-	console.log(mappings);
-
+	
 	mappings.forEach(function (mapping) {
 		// check for keyword "all"
 		if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
@@ -206,7 +205,6 @@ async function expandMappings(metadata) {
 
 		// expand out arrays of mapped items
 		functionalNeeds.forEach(function (functionalNeed) {
-			console.log(functionalNeed);
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
@@ -215,7 +213,6 @@ async function expandMappings(metadata) {
 				functionalNeedId = getIntersectionNeedId(fn1, fn2);
 				fnType = "IntersectionNeed"
 			} else functionalNeedId = getMatrixDimId("functional-needs", functionalNeed);
-			console.log(functionalNeedId);
 			userNeeds.forEach(function (userNeed) {
 				const userNeedId = getMatrixDimId("user-needs", userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
@@ -235,7 +232,6 @@ async function expandMappings(metadata) {
 
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
-	//console.log(mapping);
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
 	var result = findObjectByProperties(dbMappingIds, { "fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance });
 	if (typeof result === 'undefined') {
