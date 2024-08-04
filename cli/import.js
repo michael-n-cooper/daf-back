@@ -54,7 +54,6 @@ const accessibilityCharacteristicList = await apiGet("accessibility-characterist
 const simpleCurveMaps = await apiGet("simple-curve-maps")
 
 const knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
-writeFile("./matrix.json", JSON.stringify(knownMatrix))
 
 //#endregion
 
