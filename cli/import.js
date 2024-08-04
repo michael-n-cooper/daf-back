@@ -110,7 +110,7 @@ if (stmtId != false) {
 		});
 	}
 	sparql += ' }';
-	console.log(sparql);
+	//console.log(sparql);
 	//const importResult = await dbquery.updateQuery(sparql);
 	//console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
@@ -180,11 +180,13 @@ async function expandAccomtypeMappings(metadata) {
 		});
 	});
 
-	result.forEach(async function (mapping) {
-		mapping.id = await getAccommTypeMappingId(mapping);
+	let returnVal = new Array();
+	await result.forEach(async function (mapping) {
+		let mappingId = await getAccommTypeMappingId(mapping);
+		returnVal.push({ id: mappingId, mapping: mapping});
 	});
 
-	return (result);
+	return (returnVal);
 }
 
 // matrix mappings
@@ -223,11 +225,13 @@ async function expandMappings(metadata) {
 		});
 	});
 
-	result.forEach(async function (mapping) {
-		mapping.id = await getMappingId(mapping);
+	let returnVal = new Array();
+	await result.forEach(async function (mapping) {
+		let mappingId = await getMappingId(mapping);
+		returnVal.push({ id: mappingId, mapping: mapping})
 	});
 
-	return (result);
+	return (returnVal);
 }
 
 // get a single mapping object from the stored array, or add one if not exists
@@ -247,10 +251,11 @@ async function getMappingId(mapping) {
 }
 
 async function getAccommTypeMappingId(mapping) {
-	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.abilityId, "accommId": mapping.accommId, "charId": mapping.charId });
+	//console.log(mapping);
+	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.functionalAbility, "accommId": mapping.accommodationType, "charId": mapping.accessibilityCharacteristic });
 	if (typeof result === 'undefined') {
 		const id = idBase + uuid();
-		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
+		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.functionalAbility + '> ; a11y:supports <' + mapping.accommodationType + '> ; a11y:supports <' + mapping.accessibilityCharacteristic + '> }';
 		await dbquery.updateQuery(update);
 		return (idBase + id);
 	} else {

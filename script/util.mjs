@@ -6,6 +6,7 @@ export function findObjectByProperties(array, properties) {
 	return array.find(obj => {
 		// Check if all specified properties match
 		return Object.getOwnPropertyNames(properties).every(key => {
+			//console.log ("key: " + key + "; obj: " + obj[key] + "; property: " + properties[key])
 			if (compareStr(obj[key], properties[key])) return obj;
 		});
 	});
