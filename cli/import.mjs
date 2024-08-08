@@ -6,67 +6,83 @@ import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 
+//#region global
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
-const importFileName = 'input-modality-choice.md';//await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
 const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
 const idBase = "https://github.com/michael-n-cooper/a11y-data/daf/#";
 
-export async function run() {
-//#region check file
-const data = await getFileData(importDir + importFileName);
-// need to catch bad file name
-if (data == null) {
-	// check if file previously imported but deleted
-	let sparql = 'select ?id where { ?id a11y:contentIRI <' + contentIriBase + importFileName + '> }';
-	let result = await dbquery.selectQuery(sparql);
-	// previously imported
-	if (result.length > 0) {
-		const message = "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?";
-		const todel = await inquirer.prompt([{ "name": "todel", "type": "confirm", "message": message, }]).then((answer) => answer.todel);
-		if (todel) {
-			/**
-			 * uncomment this when ready
-			 */
-			//deleteStatement(idFrag(result[0].id));
-			console.log("Deleted " + importFileName);
-		} else console.log("Aborting");
+var metadata, content;
+var functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, referenceTypes, tags, dbMappingIds; // ids of the mapping objects corresponding to the above
+var functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList, simpleCurveMaps;
+var knownMatrix;
+var typos;
+var foundTypos = new Array();
+var importFileName, data;
+//#endregion
+
+//#region load file
+async function loadFile() {
+	const ifn = 'input-modality-choice.md';//await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
+	const dt = await getFileData(importDir + ifn);
+	// need to catch bad file name
+	if (dt == null) {
+		// check if file previously imported but deleted
+		let sparql = 'select ?id where { ?id a11y:contentIRI <' + contentIriBase + ifn + '> }';
+		let result = await dbquery.selectQuery(sparql);
+		// previously imported
+		if (result.length > 0) {
+			let todel = await checkDataDelete(ifn);
+			if (!todel) {
+				console.log("Aborting");
+			}
+		}
+		// bad file name
+		else {
+			console.log("Unable to find file \"" + ifn + "\"");
+		}
 		process.exit(0);
 	}
-	// bad file name
-	else {
-		console.log("Unable to find file \"" + importFileName + "\"");
-		process.exit(1);
-	}
+	importFileName = ifn;
+	data = dt;
+	console.log(data);
+
+	var { md, ct } = parseMD(data);
+	metadata = md;
+	content = ct;
+	console.log(ct);
+
 }
 //#endregion
 
-//#region Load content
-const { metadata, content } = parseMD(data);
+//region load references
+async function loadReferenceLists() {
+	functionalNeedList = await apiGet("functional-needs");
+	intersectionNeedList = await apiGet("intersection-needs");
+	userNeedList = await apiGet("user-needs");
+	userNeedContextList = await apiGet("user-need-contexts");
+	referenceTypes = await lookupIdLabels("ReferenceType");
+	tags = await apiGet("tags");
+	dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
 
-const functionalNeedList = await apiGet("functional-needs");
-const intersectionNeedList = await apiGet("intersection-needs");
-const userNeedList = await apiGet("user-needs");
-const userNeedContextList = await apiGet("user-need-contexts");
-const referenceTypes = await lookupIdLabels("ReferenceType");
-const tags = await apiGet("tags");
-const dbMappingIds = await apiGet("mappings"); // ids of the mapping objects corresponding to the above
+	functionalAbilityList = await apiGet("functional-abilities");
+	accommodationTypeList = await apiGet("accommodation-types");
+	accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
+	simpleCurveMaps = await apiGet("simple-curve-maps")
 
-const functionalAbilityList = await apiGet("functional-abilities");
-const accommodationTypeList = await apiGet("accommodation-types");
-const accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
-const simpleCurveMaps = await apiGet("simple-curve-maps")
+	knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
 
-const knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
-
+	typos = await loadTypos();
+}
 //#endregion
 
-//#region process typos
-const typos = await loadTypos();
-var foundTypos = new Array();
-await findMatrixTypos();
-await promptTypoCorrections();
-//#endregion
+export async function run() {
+
+await loadFile();
+
+await loadReferenceLists();
+
+await processTypos();
 
 //#region Process data
 const expandedMappings = await expandMappings(metadata);
@@ -79,7 +95,8 @@ const { title, statement, notes } = retrieveContent(content); // retrieve title 
 
 //#region Build sparql
 // check for previous
-let stmtId = await checkReimport(contentIriBase + importFileName);
+let stmtId = await checkDataDelete(contentIriBase + importFileName);
+
 if (stmtId != false) {
 
 	// construct the sparql statement
@@ -156,7 +173,7 @@ function getIntersectionNeedId(fn1, fn2) {
 
 //#region Mappings
 // accommodation type mappings
-async function expandAccomtypeMappings(metadata) {
+async function expandAccomtypeMappings() {
 	let result = new Array();
 	const mappings = metadata["accomtype-mappings"];
 
@@ -173,11 +190,11 @@ async function expandAccomtypeMappings(metadata) {
 
 		// expand out arrays of mapped items
 		functionalAbilities.forEach(function (functionalAbility) {
-			const functionalAbilityId = getMatrixDimId("functional-abilities", functionalAbility);
+			const functionalAbilityId = getMatrixDimId(knownMatrix, "functional-abilities", functionalAbility);
 			accommodationTypes.forEach(function (accommodationType) {
-				const accommodationTypeId = getMatrixDimId("accommodation-types", accommodationType);
+				const accommodationTypeId = getMatrixDimId(knownMatrix, "accommodation-types", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", accessibilityCharacteristic);
+					const accessibilityCharacteristicId = getMatrixDimId(knownMatrix, "accessibility-characteristics", accessibilityCharacteristic);
 					result.push({ "functionalAbility": functionalAbilityId, "accommodationType": accommodationTypeId, "accessibilityCharacteristic": accessibilityCharacteristicId });
 				});
 			});
@@ -185,7 +202,7 @@ async function expandAccomtypeMappings(metadata) {
 	});
 
 	let returnVal = new Array();
-	await result.forEach(async function (mapping) {
+	result.forEach(async function (mapping) {
 		let mappingId = await getAccommTypeMappingId(mapping);
 		returnVal.push({ id: mappingId, mapping: mapping});
 	});
@@ -194,7 +211,7 @@ async function expandAccomtypeMappings(metadata) {
 }
 
 // matrix mappings
-async function expandMappings(metadata) {
+async function expandMappings() {
 	let result = new Array();
 	const mappings = metadata.mappings;
 	
@@ -214,15 +231,15 @@ async function expandMappings(metadata) {
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
-				const fn1 = getMatrixDimId("functional-needs", functionalNeed.intersection[0]);
-				const fn2 = getMatrixDimId("functional-needs", functionalNeed.intersection[1]);
-				functionalNeedId = getIntersectionNeedId(fn1, fn2);
+				const fn1 = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed.intersection[0]);
+				const fn2 = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed.intersection[1]);
+				functionalNeedId = getIntersectionNeedId(knownMatrix, fn1, fn2);
 				fnType = "IntersectionNeed"
-			} else functionalNeedId = getMatrixDimId("functional-needs", functionalNeed);
+			} else functionalNeedId = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed);
 			userNeeds.forEach(function (userNeed) {
-				const userNeedId = getMatrixDimId("user-needs", userNeed);
+				const userNeedId = getMatrixDimId(knownMatrix, "user-needs", userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					const userNeedRelevanceId = getMatrixDimId("user-need-contexts", userNeedRelevance);
+					const userNeedRelevanceId = getMatrixDimId(knownMatrix, "user-need-contexts", userNeedRelevance);
 					result.push({ [fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId });
 				});
 			});
@@ -230,7 +247,7 @@ async function expandMappings(metadata) {
 	});
 
 	let returnVal = new Array();
-	await result.forEach(async function (mapping) {
+	result.forEach(async function (mapping) {
 		let mappingId = await getMappingId(mapping);
 		returnVal.push({ id: mappingId, mapping: mapping})
 	});
@@ -299,16 +316,20 @@ async function lookupIdLabels(type) {
 	return returnval;
 }
 
-async function checkReimport(contentIri) {
+async function checkDataDelete(importFileName = null) {
+	let contentIri = contentIriBase + importFileName;
 	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
 	const result = await dbquery.selectQuery(sparql);
 	if (result.length > 0) {
+		let message = importFileName == null ? "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?" : "Do you want to reimport " + label + "?";
+
 		const id = result[0].id;
 		const label = result[0].label;
-		const replace = await inquirer.prompt([{ "type": "confirm", "name": "replace", "message": "Do you want to reimport " + label + "?", }]).then((answer) => answer.replace);
+		const replace = await inquirer.prompt([{ "type": "confirm", "name": "replace", "message": message }]).then((answer) => answer.replace);
 		if (!replace) return false;
 		else {
 			await deleteStatement(id);
+			console.log("Deleted " + importFileName);
 			return id;
 		}
 	} else return null;
@@ -419,8 +440,13 @@ function retrieveContent(content) {
 //#endregion
 
 //#region Typo handling
-
-// load list of typs
+// process typos
+async function processTypos() {
+	await findMatrixTypos(metadata);
+	await promptTypoCorrections();
+	}
+	
+// load list of typos
 async function loadTypos() {
 	try {
 		const contents = await readFile(typosPath, { encoding: 'utf8' });
