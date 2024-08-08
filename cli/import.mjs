@@ -12,6 +12,8 @@ const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
 const idBase = "https://github.com/michael-n-cooper/a11y-data/daf/#";
 
+export async function run() {
+//#region check file
 const data = await getFileData(importDir + importFileName);
 // need to catch bad file name
 if (data == null) {
@@ -37,6 +39,8 @@ if (data == null) {
 		process.exit(1);
 	}
 }
+//#endregion
+
 //#region Load content
 const { metadata, content } = parseMD(data);
 
@@ -113,6 +117,7 @@ if (stmtId != false) {
 	//const importResult = await dbquery.updateQuery(sparql);
 	//console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
+}
 //#endregion
 
 //#region matrix dimensions (functional needs, user needs, relevances)
@@ -550,3 +555,5 @@ function makeInquirerQuestion(qId, label, listname) {
 	return q;
 }
 //#endregion
+
+await run();
