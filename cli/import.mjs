@@ -12,7 +12,7 @@ const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
 const idBase = "https://github.com/michael-n-cooper/a11y-data/daf/#";
 
-var metadata, content;
+var fileMeta, fileContent;
 var functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, referenceTypes, tags, dbMappingIds; // ids of the mapping objects corresponding to the above
 var functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList, simpleCurveMaps;
 var knownMatrix;
@@ -45,13 +45,10 @@ async function loadFile() {
 	}
 	importFileName = ifn;
 	data = dt;
-	console.log(data);
 
-	var { md, ct } = parseMD(data);
-	metadata = md;
-	content = ct;
-	console.log(ct);
-
+	const { metadata, content } = parseMD(data);
+	fileMeta = metadata;
+	fileContent = content;
 }
 //#endregion
 
@@ -85,12 +82,12 @@ await loadReferenceLists();
 await processTypos();
 
 //#region Process data
-const expandedMappings = await expandMappings(metadata);
-const expandedAccommtypeMappings = await expandAccomtypeMappings(metadata);
+const expandedMappings = await expandMappings(fileMeta);
+const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
 
-const tagsArr = metadata.tags ? metadata.tags : new Array(); // retrieve tags
-const { research, guidelines } = retrieveReferences(metadata); // retrieve references, divide into research and guidelines
-const { title, statement, notes } = retrieveContent(content); // retrieve title and statement
+const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
+const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
+const { title, statement, notes } = retrieveContent(fileContent); // retrieve title and statement
 //#endregion
 
 //#region Build sparql
@@ -175,7 +172,7 @@ function getIntersectionNeedId(fn1, fn2) {
 // accommodation type mappings
 async function expandAccomtypeMappings() {
 	let result = new Array();
-	const mappings = metadata["accomtype-mappings"];
+	const mappings = fileMeta["accomtype-mappings"];
 
 	mappings.forEach(function (mapping) {
 		// check for keyword "all"
@@ -213,7 +210,7 @@ async function expandAccomtypeMappings() {
 // matrix mappings
 async function expandMappings() {
 	let result = new Array();
-	const mappings = metadata.mappings;
+	const mappings = fileMeta.mappings;
 	
 	mappings.forEach(function (mapping) {
 		// check for keyword "all"
@@ -345,11 +342,11 @@ async function deleteStatement(id) {
 
 //#region content
 // references
-function retrieveReferences(metadata) {
+function retrieveReferences(fileMeta) {
 	var research = new Array();
 	var guidelines = new Array();
-	if (metadata.references) {
-		const references = metadata.references;
+	if (fileMeta.references) {
+		const references = fileMeta.references;
 
 		references.forEach(function (referenceType) {
 			if (referenceType.research !== undefined && Array.isArray(referenceType.research)) {
@@ -370,9 +367,9 @@ function retrieveReferences(metadata) {
 }
 
 // content
-function retrieveContent(content) {
+function retrieveContent(fileContent) {
 	let reader = new commonmark.Parser();
-	let parsed = reader.parse(content);
+	let parsed = reader.parse(fileContent);
 	//console.log(parsed);
 	let walker = parsed.walker();
 
@@ -442,7 +439,7 @@ function retrieveContent(content) {
 //#region Typo handling
 // process typos
 async function processTypos() {
-	await findMatrixTypos(metadata);
+	await findMatrixTypos(fileMeta);
 	await promptTypoCorrections();
 	}
 	
@@ -490,7 +487,7 @@ function correctPotentialTypo(listname, value) {
 
 // look for potential typos in the yaml mappings
 async function findMatrixTypos() {
-	const mp = metadata.mappings;
+	const mp = fileMeta.mappings;
 	mp.forEach(function (mapping) {
 		//check for arrays Array.isArray(obj)
 		//handle intersection objects
@@ -512,7 +509,7 @@ async function findMatrixTypos() {
 		});
 	});
 
-	const accomTypeMappings = metadata["accomtype-mappings"];
+	const accomTypeMappings = fileMeta["accomtype-mappings"];
 	accomTypeMappings.forEach(function (mapping) {
 		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
 		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
