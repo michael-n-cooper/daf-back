@@ -137,12 +137,10 @@ if (stmtId != false) {
 //#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(listname, label) {
 	// check against list of known typos, correct
-	label = correctPotentialTypo(listname, label);
+	let correctLabel = correctPotentialTypo(listname, label);
 	let matrixListObj = findObjectByProperties(knownMatrix, {"listname": listname});
-	let matrixList = matrixListObj.list;
-	//console.log(matrixList);
-	if (typeof matrixList !== 'undefined') {
-		let matrixDimId = findObjectByProperties(matrixList, { "label": label });
+	if (typeof matrixListObj !== 'undefined') {
+		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": correctLabel });
 		return matrixDimId.id;
 	} else return null;
 }
@@ -454,14 +452,13 @@ async function loadTypos() {
 
 // add a typo to the list
 function storeTypo(listname, inc, cor) {
-	let listForTypo = findObjectByProperties(typos, { "listname": listname })
-	listForTypo.push({ incorrect: inc, correct: cor });
+	typos.push({ listname: listname, incorrect: inc, correct: cor });
 }
 
 // save the list of typos
 async function saveTypos() {
 	try {
-		//await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
+		await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
 	} catch (err) {
 		console.error(err);
 	}
@@ -543,7 +540,7 @@ async function promptTypoCorrections() {
 	for (var i = 0; i < questions.length; i++) {
 		let qid = "q" + i;
 		let listname = questionLists[qid];
-		storeTypo(listname, answers[qid]);
+		storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
 	}
 
 	saveTypos();

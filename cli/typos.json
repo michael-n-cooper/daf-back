@@ -1,7 +1,1 @@
-[
-	{
-		"listname": "accommodation-types",
-		"incorrect": "testre",
-		"correct": "tester"
-	}
-]
+[{"listname":"accommodation-types","incorrect":"testre","correct":"tester"},{"listname":"functional-needs","incorrect":"Limted vision","correct":"Limited vision"},{"listname":"functional-abilities","incorrect":"language kills","correct":"Language skills"}]
