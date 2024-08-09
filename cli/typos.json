@@ -1,30 +1,7 @@
 [
 	{
 		"listname": "accommodation-types",
-		"list": []
-	},
-	{
-		"listname": "accessibility-characteristics",
-		"list": []
-	},
-	{
-		"listname": "functional-abilities",
-		"list": []
-	},
-	{
-		"listname": "functional-needs",
-		"list": []
-	},
-	{
-		"listname": "intersection-needs",
-		"list": []
-	},
-	{
-		"listname": "user-needs",
-		"list": []
-	},
-	{
-		"listname": "user-need-contexts",
-		"list": []
+		"incorrect": "testre",
+		"correct": "tester"
 	}
 ]

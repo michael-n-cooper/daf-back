@@ -137,15 +137,12 @@ if (stmtId != false) {
 //#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(listname, label) {
 	// check against list of known typos, correct
-
-	/**
-	 * uncomment this
-	 */
-	//label = correctPotentialTypo(listname, label);
-
-	let matrixListObj = findObjectByProperties(knownMatrix, { "listname": listname });
-	if (typeof matrixListObj !== 'undefined') {
-		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": label });
+	label = correctPotentialTypo(listname, label);
+	let matrixListObj = findObjectByProperties(knownMatrix, {"listname": listname});
+	let matrixList = matrixListObj.list;
+	//console.log(matrixList);
+	if (typeof matrixList !== 'undefined') {
+		let matrixDimId = findObjectByProperties(matrixList, { "label": label });
 		return matrixDimId.id;
 	} else return null;
 }
@@ -187,11 +184,11 @@ async function expandAccomtypeMappings() {
 
 		// expand out arrays of mapped items
 		functionalAbilities.forEach(function (functionalAbility) {
-			const functionalAbilityId = getMatrixDimId(knownMatrix, "functional-abilities", functionalAbility);
+			const functionalAbilityId = getMatrixDimId("functional-abilities", functionalAbility);
 			accommodationTypes.forEach(function (accommodationType) {
-				const accommodationTypeId = getMatrixDimId(knownMatrix, "accommodation-types", accommodationType);
+				const accommodationTypeId = getMatrixDimId("accommodation-types", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					const accessibilityCharacteristicId = getMatrixDimId(knownMatrix, "accessibility-characteristics", accessibilityCharacteristic);
+					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", accessibilityCharacteristic);
 					result.push({ "functionalAbility": functionalAbilityId, "accommodationType": accommodationTypeId, "accessibilityCharacteristic": accessibilityCharacteristicId });
 				});
 			});
@@ -228,15 +225,15 @@ async function expandMappings() {
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
-				const fn1 = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed.intersection[0]);
-				const fn2 = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed.intersection[1]);
-				functionalNeedId = getIntersectionNeedId(knownMatrix, fn1, fn2);
-				fnType = "IntersectionNeed"
-			} else functionalNeedId = getMatrixDimId(knownMatrix, "functional-needs", functionalNeed);
+				const fn1 = getMatrixDimId("functional-needs", functionalNeed.intersection[0]);
+				const fn2 = getMatrixDimId("functional-needs", functionalNeed.intersection[1]);
+				functionalNeedId = getIntersectionNeedId("intersection-needs", fn1, fn2);
+				fnType = "IntersectionNeed";
+			} else functionalNeedId = getMatrixDimId("functional-needs", functionalNeed);
 			userNeeds.forEach(function (userNeed) {
-				const userNeedId = getMatrixDimId(knownMatrix, "user-needs", userNeed);
+				const userNeedId = getMatrixDimId("user-needs", userNeed);
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					const userNeedRelevanceId = getMatrixDimId(knownMatrix, "user-need-contexts", userNeedRelevance);
+					const userNeedRelevanceId = getMatrixDimId("user-need-contexts", userNeedRelevance);
 					result.push({ [fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId });
 				});
 			});
@@ -449,11 +446,6 @@ async function loadTypos() {
 		const contents = await readFile(typosPath, { encoding: 'utf8' });
 		let typosObj = JSON.parse(contents);
 
-		/*
-		knownMatrix.forEach(function (list) {
-			if (!findObjectByProperties(typos, { "listname": list.listname })) typosObj.push({ "listname": [] });
-		});
-		*/
 		return (typosObj);
 	} catch (err) {
 		console.error("loadTypos: " + err.message);
@@ -477,11 +469,8 @@ async function saveTypos() {
 
 // check if a value is in the list of known typos
 function correctPotentialTypo(listname, value) {
-	let typoList = findObjectByProperties(typos, { "listname": listname });
-	if (typeof typoList !== 'undefined') {
-		let typoObj = findObjectByProperties(typoList, { "incorrect": value });
-		if (typeof typoObj !== 'undefined') return typoObj.correct;
-	}
+	let typoObj = findObjectByProperties(typos, { "incorrect": value });
+	if (typeof typoObj !== 'undefined') return typoObj.correct;
 	else return value;
 }
 
@@ -531,11 +520,11 @@ async function findMatrixTypos() {
 function checkPotentialTypo(listname, label) {
 	let found = false;
 	// check for known typo, get sublist then check that
-	let typoList = findObjectByProperties(knownMatrix, { "listname": listname });
-	if (typeof typoList !== 'undefined' && typeof findObjectByProperties(typoList.list, { "label": label }) === 'undefined') found = true;
+	let correctList = findObjectByProperties(knownMatrix, {"listname": listname}).list;
+	if (typeof correctList !== 'undefined' && typeof findObjectByProperties(correctList, { "label": label }) === 'undefined') found = true;
 	// check for already checked typo
-	let typoCorrectedList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
-	if (typeof typoCorrectedList !== 'undefined') found = true;
+	let typoCorrectedObj = findObjectByProperties(foundTypos, { "incorrect": label });
+	if (typeof typoCorrectedObj !== 'undefined') found = true;
 
 	if (found) foundTypos.push({ "listname": listname, "incorrect": label });
 }
@@ -566,7 +555,7 @@ async function promptTypoCorrections() {
 // inquirer
 function makeInquirerQuestion(qId, label, listname) {
 
-	let arr = findObjectByProperties(knownMatrix, { "listname": listname }).list;
+	let arr = findObjectByProperties(knownMatrix, {"listname": listname}).list;
 	var q = {
 		type: "rawlist",
 		name: qId,
