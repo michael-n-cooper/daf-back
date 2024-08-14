@@ -16,7 +16,7 @@ var fileMeta, fileContent;
 var functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, referenceTypes, tags, dbMappingIds; // ids of the mapping objects corresponding to the above
 var functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList, simpleCurveMaps;
 var knownMatrix;
-var typos;
+var typoCorrectedList = new Array();
 var foundTypos = new Array();
 var importFileName, data;
 //#endregion
@@ -69,7 +69,7 @@ async function loadReferenceLists() {
 
 	knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
 
-	typos = await loadTypos();
+	await loadTypos();
 }
 //#endregion
 
@@ -80,6 +80,7 @@ await loadFile();
 await loadReferenceLists();
 
 await processTypos();
+console.log(foundTypos)
 
 //#region Process data
 const expandedMappings = await expandMappings(fileMeta);
@@ -128,8 +129,8 @@ if (stmtId != false) {
 	}
 	sparql += ' }';
 	//console.log(sparql);
-	//const importResult = await dbquery.updateQuery(sparql);
-	//console.log(JSON.stringify(importResult));
+	const importResult = await dbquery.updateQuery(sparql);
+	console.log(JSON.stringify(importResult));
 } else console.log("Aborting");
 }
 //#endregion
@@ -137,7 +138,7 @@ if (stmtId != false) {
 //#region matrix dimensions (functional needs, user needs, relevances)
 function getMatrixDimId(listname, label) {
 	// check against list of known typos, correct
-	let correctLabel = correctPotentialTypo(listname, label);
+	let correctLabel = getCorrectLabel(listname, label);
 	let matrixListObj = findObjectByProperties(knownMatrix, {"listname": listname});
 	if (typeof matrixListObj !== 'undefined') {
 		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": correctLabel });
@@ -223,15 +224,15 @@ async function expandMappings() {
 			var functionalNeedId;
 			var fnType = "FunctionalNeed";
 			if (typeof functionalNeed === 'object') {
-				const fn1 = getMatrixDimId("functional-needs", functionalNeed.intersection[0]);
-				const fn2 = getMatrixDimId("functional-needs", functionalNeed.intersection[1]);
+				const fn1 = getMatrixDimId("functional-needs", getCorrectLabel("functional-needs", functionalNeed.intersection[0]));
+				const fn2 = getMatrixDimId("functional-needs", getCorrectLabel("functional-needs", functionalNeed.intersection[1]));
 				functionalNeedId = getIntersectionNeedId("intersection-needs", fn1, fn2);
 				fnType = "IntersectionNeed";
-			} else functionalNeedId = getMatrixDimId("functional-needs", functionalNeed);
+			} else functionalNeedId = getMatrixDimId("functional-needs", getCorrectLabel("functional-needs", functionalNeed));
 			userNeeds.forEach(function (userNeed) {
-				const userNeedId = getMatrixDimId("user-needs", userNeed);
+				const userNeedId = getMatrixDimId("user-needs", getCorrectLabel("user-needs", userNeed));
 				userNeedRelevances.forEach(function (userNeedRelevance) {
-					const userNeedRelevanceId = getMatrixDimId("user-need-contexts", userNeedRelevance);
+					const userNeedRelevanceId = getMatrixDimId("user-need-contexts", getCorrectLabel("user-need-contexts", userNeedRelevance));
 					result.push({ [fnType]: functionalNeedId, "UserNeed": userNeedId, "UserNeedRelevance": userNeedRelevanceId });
 				});
 			});
@@ -443,8 +444,9 @@ async function loadTypos() {
 	try {
 		const contents = await readFile(typosPath, { encoding: 'utf8' });
 		let typosObj = JSON.parse(contents);
+		console.log(typosObj);
 
-		return (typosObj);
+		typoCorrectedList = typosObj;
 	} catch (err) {
 		console.error("loadTypos: " + err.message);
 	}
@@ -452,23 +454,16 @@ async function loadTypos() {
 
 // add a typo to the list
 function storeTypo(listname, inc, cor) {
-	typos.push({ listname: listname, incorrect: inc, correct: cor });
+	typoCorrectedList.push({ listname: listname, incorrect: inc, correct: cor });
 }
 
 // save the list of typos
 async function saveTypos() {
 	try {
-		await writeFile(typosPath, JSON.stringify(typos), { encoding: 'utf8' });
+		await writeFile(typosPath, JSON.stringify(typoCorrectedList), { encoding: 'utf8' });
 	} catch (err) {
 		console.error(err);
 	}
-}
-
-// check if a value is in the list of known typos
-function correctPotentialTypo(listname, value) {
-	let typoObj = findObjectByProperties(typos, { "incorrect": value });
-	if (typeof typoObj !== 'undefined') return typoObj.correct;
-	else return value;
 }
 
 // look for potential typos in the yaml mappings
@@ -515,15 +510,25 @@ async function findMatrixTypos() {
 }
 
 function checkPotentialTypo(listname, label) {
-	let found = false;
-	// check for known typo, get sublist then check that
+	// check against reference list
 	let correctList = findObjectByProperties(knownMatrix, {"listname": listname}).list;
-	if (typeof correctList !== 'undefined' && typeof findObjectByProperties(correctList, { "label": label }) === 'undefined') found = true;
-	// check for already checked typo
-	let typoCorrectedObj = findObjectByProperties(foundTypos, { "incorrect": label });
-	if (typeof typoCorrectedObj !== 'undefined') found = true;
+	if (typeof correctList !== 'undefined') {
+		if (typeof findObjectByProperties(correctList, { "label": label }) !== 'undefined') {
+			return label;
+		}
+	}
+	// check against already found list
+	let foundList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
+	if (typeof foundList !== 'undefined') {
+		return foundList.correct;
+	}
+	// check against previously stored list
+	if (typeof findObjectByProperties(typoCorrectedList, {"listname": listname, "correct": label}) !== 'undefined') {
+		return label;
+	}
 
-	if (found) foundTypos.push({ "listname": listname, "incorrect": label });
+	foundTypos.push({ "listname": listname, "incorrect": label });
+	return null;
 }
 
 async function promptTypoCorrections() {
@@ -542,8 +547,14 @@ async function promptTypoCorrections() {
 		let listname = questionLists[qid];
 		storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
 	}
-
+console.log(typoCorrectedList);
 	saveTypos();
+}
+
+function getCorrectLabel(listname, label) {
+	let typoCorrection = findObjectByProperties(typoCorrectedList, {"listname": listname, "incorrect": label});
+	if (typeof typoCorrection !== 'undefined') return typoCorrection.correct;
+	else return label;
 }
 
 //#endregion

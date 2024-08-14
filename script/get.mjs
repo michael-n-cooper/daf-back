@@ -142,7 +142,7 @@ async function findIntersectionCurveMapId(id) {
 
 async function findSimpleCurveMapList(id = null, supportsFilter = "") {
     let idFilter = "";
-    if (id != null) idFilter = " values ?id { : " + id + " } . ";
+    if (id != null) idFilter = " values ?id { :" + id + " } . ";
     const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accommId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . ?stmtId a a11y:AccessibilityStatement . optional { ?stmtId a11y:supports ?id } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
 	const val = await selectQuery(sparql);
     return val;
@@ -182,8 +182,8 @@ async function findStatementId(id) {
     const mappings = await findMappingList("Mapping", ":" + id + " a11y:supports ?id . ");
     val[0].mappings = mappings;
 
-    const accommtypeMappings = await findSimpleCurveMapList(null, " :" + id + " a11y:supports ?id . ");
-    val[0]["accommtype-mappings"] = accommtypeMappings;
+    const simpleCurveMaps = await findSimpleCurveMapList(null, " :" + id + " a11y:supports ?id . ");
+    val[0]["simple-curve-maps"] = simpleCurveMaps;
 
     return val;
 }
