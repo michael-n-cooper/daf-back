@@ -96,6 +96,7 @@ export async function run() {
 	//#region Process data
 	const expandedMappings = await expandMappings(fileMeta);
 	const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
+	console.log(expandedAccommtypeMappings);
 
 	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
 	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
@@ -115,6 +116,7 @@ export async function run() {
 		expandedMappings.forEach(function (mapping) {
 			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
+		console.log(expandedAccommtypeMappings)
 		expandedAccommtypeMappings.forEach(function (mapping) {
 			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
@@ -177,15 +179,11 @@ function getIntersectionNeedId(fn1, fn2) {
 async function expandAccomtypeMappings() {
 	let result = new Array();
 	const mappings = fileMeta["accomtype-mappings"];
+	console.log(mappings);
 
 	mappings.forEach(function (mapping) {
-		// check for keyword "all"
-		if (typeof mapping['functional-ability'] === 'string' && compareStr(mapping['functional-ability'], "all")) mapping['functional-ability'] = getOneProp(functionalAbilityList, 'label');
-		if (typeof mapping['accommodation-type'] === 'string' && compareStr(mapping['accommodation-type'], "all")) mapping['accommodation-type'] = getOneProp(accommodationTypeList, 'label');
-		if (typeof mapping['accessibility-characteristic'] === 'string' && compareStr(mapping['accessibility-characteristic'], "all")) mapping['accessibility-characteristic'] = getOneProp(accessibilityCharacteristicList, 'label');
-
 		// make sure the values are arrays
-		const functionalAbilities = (typeof mapping['functional-ability'] === 'string' || (typeof mapping['functional-ability'] === 'object' && !Array.isArray(mapping['functional-ability']))) ? [mapping['functional-ability']] : mapping['functional-ability'];
+		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
 		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
 		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
 
@@ -196,16 +194,17 @@ async function expandAccomtypeMappings() {
 				const accommodationTypeId = getMatrixDimId("accommodation-types", accommodationType);
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
 					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", accessibilityCharacteristic);
-					result.push({ "functionalAbility": functionalAbilityId, "accommodationType": accommodationTypeId, "accessibilityCharacteristic": accessibilityCharacteristicId });
+					result.push({ "abilityId": functionalAbilityId, "accommId": accommodationTypeId, "charId": accessibilityCharacteristicId });
 				});
 			});
 		});
 	});
 
-	let returnVal = new Array();
+	var returnVal = new Array();
 	result.forEach(async function (mapping) {
 		let mappingId = await getAccommTypeMappingId(mapping);
-		returnVal.push({ id: mappingId, mapping: mapping });
+		let pushObj = { id: mappingId, mapping: mapping };
+		returnVal.push(pushObj);
 	});
 
 	return (returnVal);
@@ -273,11 +272,10 @@ async function getMappingId(mapping) {
 }
 
 async function getAccommTypeMappingId(mapping) {
-	//console.log(mapping);
-	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.functionalAbility, "accommId": mapping.accommodationType, "charId": mapping.accessibilityCharacteristic });
+	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.abilityId, "accommId": mapping.accommId, "charId": mapping.charId });
 	if (typeof result === 'undefined') {
 		const id = idBase + uuid();
-		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.functionalAbility + '> ; a11y:supports <' + mapping.accommodationType + '> ; a11y:supports <' + mapping.accessibilityCharacteristic + '> }';
+		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
 		await dbquery.updateQuery(update);
 		return (idBase + id);
 	} else {
