@@ -19,30 +19,42 @@ var knownMatrix;
 var typoCorrectedList = new Array();
 var foundTypos = new Array();
 var importFileName, data;
+
+var stmtId = null;
 //#endregion
 
 //#region load file
 async function loadFile() {
-	const ifn = 'input-modality-choice.md';//await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
+	const ifn = await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
 	const dt = await getFileData(importDir + ifn);
-	// need to catch bad file name
+	const existing = await stmtIdFromFilename(ifn);
+	// file missing
+	// check if there is related data that you want to delete
 	if (dt == null) {
-		// check if file previously imported but deleted
-		let sparql = 'select ?id where { ?id a11y:contentIRI <' + contentIriBase + ifn + '> }';
-		let result = await dbquery.selectQuery(sparql);
-		// previously imported
-		if (result.length > 0) {
-			let todel = await checkDataDelete(ifn);
-			if (!todel) {
+		if (existing.length > 0) {
+			let toDel = await checkDataDelete(ifn);
+			if (toDel) {
+				await deleteStatement(existing[0].id);
+				console.log("Deleted " + existing.label);
+			} else {
 				console.log("Aborting");
 			}
-		}
+		} else {
 		// bad file name
-		else {
 			console.log("Unable to find file \"" + ifn + "\"");
 		}
 		process.exit(0);
 	}
+	else {
+		let toReimport = await checkDataReimport(ifn);
+		if (toReimport) {
+			stmtId = existing[0].id;
+			await deleteStatement(existing[0].id);
+		} else {
+			process.exit(0);
+		}
+	}
+
 	importFileName = ifn;
 	data = dt;
 
@@ -75,63 +87,59 @@ async function loadReferenceLists() {
 
 export async function run() {
 
-await loadFile();
+	await loadFile();
 
-await loadReferenceLists();
+	await loadReferenceLists();
 
-await processTypos();
-console.log(foundTypos)
+	await processTypos();
 
-//#region Process data
-const expandedMappings = await expandMappings(fileMeta);
-const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
+	//#region Process data
+	const expandedMappings = await expandMappings(fileMeta);
+	const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
 
-const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
-const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
-const { title, statement, notes } = retrieveContent(fileContent); // retrieve title and statement
-//#endregion
+	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
+	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
+	const { title, statement, notes } = retrieveContent(fileContent); // retrieve title and statement
+	//#endregion
 
-//#region Build sparql
-// check for previous
-let stmtId = await checkDataDelete(contentIriBase + importFileName);
+	//#region Build sparql
+	if (stmtId != false) {
 
-if (stmtId != false) {
-
-	// construct the sparql statement
-	if (stmtId == null) stmtId = idBase + uuid();
-	let sparql = 'insert data { <' + stmtId + '> a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
-	sparql += ' ; a11y:stmtGuidance "' + escSparql(statement) + '"@en';
-	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
-	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
-	sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
-	expandedMappings.forEach(function (mapping) {
-		sparql += ' ; a11y:supports <' + mapping.id + '>';
-	});
-	expandedAccommtypeMappings.forEach(function (mapping) {
-		sparql += ' ; a11y:supports <' + mapping.id + '>';
-	});
-	tagsArr.forEach(function (tag) {
-		sparql += ' ; a11y:tags <' + getIdByLabel(tags, tag, 'Tag') + '>';
-	});
-	if (research.length > 0) {
-		research.forEach(function (link) {
-			const linkId = idBase + uuid();
-			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
-			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
+		// construct the sparql statement
+		if (stmtId == null) stmtId = idBase + uuid();
+		let sparql = 'insert data { <' + stmtId + '> a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
+		sparql += ' ; a11y:stmtGuidance "' + escSparql(statement) + '"@en';
+		sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
+		if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
+		sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
+		expandedMappings.forEach(function (mapping) {
+			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
-	}
-	if (guidelines.length > 0) {
-		guidelines.forEach(function (link) {
-			const linkId = idBase + uuid();
-			sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
-			sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
+		expandedAccommtypeMappings.forEach(function (mapping) {
+			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
-	}
-	sparql += ' }';
-	//console.log(sparql);
-	const importResult = await dbquery.updateQuery(sparql);
-	console.log(JSON.stringify(importResult));
-} else console.log("Aborting");
+		tagsArr.forEach(function (tag) {
+			sparql += ' ; a11y:tags <' + getIdByLabel(tags, tag, 'Tag') + '>';
+		});
+		if (research.length > 0) {
+			research.forEach(function (link) {
+				const linkId = idBase + uuid();
+				sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'research', 'ReferenceType') + '>';
+				sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
+			});
+		}
+		if (guidelines.length > 0) {
+			guidelines.forEach(function (link) {
+				const linkId = idBase + uuid();
+				sparql += ' . <' + linkId + '> a a11y:Reference ; a11y:refIRI <' + link.uri + '> ; a11y:refNote "' + escSparql(link.note) + '"@en ; a11y:refType <' + getIdByLabel(referenceTypes, 'guidelines', 'ReferenceType') + '>';
+				sparql += ' . <' + stmtId + '> a11y:references <' + linkId + '>';
+			});
+		}
+		sparql += ' }';
+		//console.log(sparql);
+		const importResult = await dbquery.updateQuery(sparql);
+		console.log(JSON.stringify(importResult));
+	} else console.log("Aborting");
 }
 //#endregion
 
@@ -139,7 +147,7 @@ if (stmtId != false) {
 function getMatrixDimId(listname, label) {
 	// check against list of known typos, correct
 	let correctLabel = getCorrectLabel(listname, label);
-	let matrixListObj = findObjectByProperties(knownMatrix, {"listname": listname});
+	let matrixListObj = findObjectByProperties(knownMatrix, { "listname": listname });
 	if (typeof matrixListObj !== 'undefined') {
 		let matrixDimId = findObjectByProperties(matrixListObj.list, { "label": correctLabel });
 		return matrixDimId.id;
@@ -197,7 +205,7 @@ async function expandAccomtypeMappings() {
 	let returnVal = new Array();
 	result.forEach(async function (mapping) {
 		let mappingId = await getAccommTypeMappingId(mapping);
-		returnVal.push({ id: mappingId, mapping: mapping});
+		returnVal.push({ id: mappingId, mapping: mapping });
 	});
 
 	return (returnVal);
@@ -207,7 +215,7 @@ async function expandAccomtypeMappings() {
 async function expandMappings() {
 	let result = new Array();
 	const mappings = fileMeta.mappings;
-	
+
 	mappings.forEach(function (mapping) {
 		// check for keyword "all"
 		if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
@@ -242,7 +250,7 @@ async function expandMappings() {
 	let returnVal = new Array();
 	result.forEach(async function (mapping) {
 		let mappingId = await getMappingId(mapping);
-		returnVal.push({ id: mappingId, mapping: mapping})
+		returnVal.push({ id: mappingId, mapping: mapping })
 	});
 
 	return (returnVal);
@@ -309,23 +317,25 @@ async function lookupIdLabels(type) {
 	return returnval;
 }
 
-async function checkDataDelete(importFileName = null) {
-	let contentIri = contentIriBase + importFileName;
+async function checkDataDelete(importFileName) {
+	const message = "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?";
+
+	const del = await inquirer.prompt([{ "type": "confirm", "name": "delete", "message": message }]).then((answer) => answer.delete);
+	return del;
+}
+
+async function checkDataReimport(importFileName) {
+	const message = "The file \"" + importFileName + "\" was previously imported. Do you want to update data from this file?";
+
+	const reimport = await inquirer.prompt([{ "type": "confirm", "name": "delete", "message": message }]).then((answer) => answer.delete);
+	return reimport;
+}
+
+async function stmtIdFromFilename(importFileName) {
+	const contentIri = contentIriBase + importFileName;
 	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
 	const result = await dbquery.selectQuery(sparql);
-	if (result.length > 0) {
-		let message = importFileName == null ? "The file \"" + importFileName + "\" was previously imported but cannot be found. Do you want to delete data from this file?" : "Do you want to reimport " + label + "?";
-
-		const id = result[0].id;
-		const label = result[0].label;
-		const replace = await inquirer.prompt([{ "type": "confirm", "name": "replace", "message": message }]).then((answer) => answer.replace);
-		if (!replace) return false;
-		else {
-			await deleteStatement(id);
-			console.log("Deleted " + importFileName);
-			return id;
-		}
-	} else return null;
+	return result;
 }
 
 async function deleteStatement(id) {
@@ -437,14 +447,13 @@ function retrieveContent(fileContent) {
 async function processTypos() {
 	await findMatrixTypos(fileMeta);
 	await promptTypoCorrections();
-	}
-	
+}
+
 // load list of typos
 async function loadTypos() {
 	try {
 		const contents = await readFile(typosPath, { encoding: 'utf8' });
 		let typosObj = JSON.parse(contents);
-		console.log(typosObj);
 
 		typoCorrectedList = typosObj;
 	} catch (err) {
@@ -511,20 +520,21 @@ async function findMatrixTypos() {
 
 function checkPotentialTypo(listname, label) {
 	// check against reference list
-	let correctList = findObjectByProperties(knownMatrix, {"listname": listname}).list;
+	let correctList = findObjectByProperties(knownMatrix, { "listname": listname }).list;
 	if (typeof correctList !== 'undefined') {
 		if (typeof findObjectByProperties(correctList, { "label": label }) !== 'undefined') {
 			return label;
 		}
 	}
+	// check against previously stored list
+	let knownTypo = findObjectByProperties(typoCorrectedList, { "listname": listname, "incorrect": label });
+	if (typeof knownTypo !== 'undefined') {
+		return knownTypo.correct;
+	}
 	// check against already found list
 	let foundList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
 	if (typeof foundList !== 'undefined') {
 		return foundList.correct;
-	}
-	// check against previously stored list
-	if (typeof findObjectByProperties(typoCorrectedList, {"listname": listname, "correct": label}) !== 'undefined') {
-		return label;
 	}
 
 	foundTypos.push({ "listname": listname, "incorrect": label });
@@ -547,12 +557,11 @@ async function promptTypoCorrections() {
 		let listname = questionLists[qid];
 		storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
 	}
-console.log(typoCorrectedList);
 	saveTypos();
 }
 
 function getCorrectLabel(listname, label) {
-	let typoCorrection = findObjectByProperties(typoCorrectedList, {"listname": listname, "incorrect": label});
+	let typoCorrection = findObjectByProperties(typoCorrectedList, { "listname": listname, "incorrect": label });
 	if (typeof typoCorrection !== 'undefined') return typoCorrection.correct;
 	else return label;
 }
@@ -563,7 +572,7 @@ function getCorrectLabel(listname, label) {
 // inquirer
 function makeInquirerQuestion(qId, label, listname) {
 
-	let arr = findObjectByProperties(knownMatrix, {"listname": listname}).list;
+	let arr = findObjectByProperties(knownMatrix, { "listname": listname }).list;
 	var q = {
 		type: "rawlist",
 		name: qId,
