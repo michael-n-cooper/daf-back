@@ -1,10 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, readdir } from 'node:fs/promises';
 import parseMD from 'parse-md';
 import * as dbquery from '../script/dbquery.mjs';
 import { findObjectByProperties, compareStr, normalizeStr, isValidUrl, getOneProp, getFileData, escSparql, apiGet } from '../script/util.mjs';
 import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 //#region global
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
@@ -18,49 +19,78 @@ var functionalAbilityList, accommodationTypeList, accessibilityCharacteristicLis
 var knownMatrix;
 var typoCorrectedList = new Array();
 var foundTypos = new Array();
-var importFileName, data;
+var importFileName;
 
 var stmtId = null;
 //#endregion
 
+async function run() {
+	await loadReferenceLists();
+
+	const answers = await inquirer.prompt([{ name: "mode", message: "Import single file or directory?", type: "list", choices: [{ name: "File", value: "file" }, { "name": "Dir", "value": "dir" }] }, { name: "path", message: "File or directory name:" }]);
+
+	const foldersPath = pathToFileURL(importDir).href.replace('///', '//');
+
+	let fileNames;
+	if (answers.mode == "file") fileNames = [answers.path];
+	else fileNames = await readdir(fileURLToPath(foldersPath));
+
+	for await (let fileName of fileNames) {
+		try {
+			console.log("Processing " + fileName);
+			let fileData = await loadFile(fileURLToPath(foldersPath) + fileName, fileName, answers.mode == "file" ? true : false);
+			if (fileData == null) throw new Error("Unable to load " + fileName);
+
+			await processFile(fileData);
+		} catch (error) {
+			console.error(error.message);
+			console.error(error.trace);
+			await appendFile("./errors.txt", fileName + "\n");
+		}
+	};
+
+}
+
 //#region load file
-async function loadFile() {
-	const ifn = await inquirer.prompt([{ "name": "fileName", "message": "File to import:", }]).then((answer) => answer.fileName);
-	const dt = await getFileData(importDir + ifn);
-	const existing = await stmtIdFromFilename(ifn);
+async function loadFile(filePath, fileName, checkReimport) {
+	const fileData = await getFileData(filePath);
+	const existing = await stmtIdFromFilename(fileName);
+
 	// file missing
-	// check if there is related data that you want to delete
-	if (dt == null) {
+	if (fileData == null) {
+		// check if there is related data that you want to delete
 		if (existing.length > 0) {
-			let toDel = await checkDataDelete(ifn);
+			let toDel = await checkDataDelete(fileName);
 			if (toDel) {
 				await deleteStatement(existing[0].id);
 				console.log("Deleted " + existing.label);
+				return null;
 			} else {
-				console.log("Aborting");
+				console.log("Skipping delete of " + fileName);
+				return null;
 			}
 		} else {
-		// bad file name
-			console.log("Unable to find file \"" + ifn + "\"");
+			console.log("Invalid filename " + fileName);
+			return null;
 		}
-		process.exit(0);
 	}
-	else {
-		let toReimport = await checkDataReimport(ifn);
+
+	//check reimport
+	if (checkReimport) {
+		let toReimport = await checkDataReimport(fileName);
 		if (toReimport) {
 			stmtId = existing[0].id;
 			await deleteStatement(existing[0].id);
 		} else {
-			process.exit(0);
+			console.log("Skipping reimport of " + fileName);
+			return null;
 		}
 	}
 
-	importFileName = ifn;
-	data = dt;
+	importFileName = fileName;
 
-	const { metadata, content } = parseMD(data);
-	fileMeta = metadata;
-	fileContent = content;
+	const result = parseMD(fileData);
+	return result;
 }
 //#endregion
 
@@ -85,11 +115,9 @@ async function loadReferenceLists() {
 }
 //#endregion
 
-export async function run() {
-
-	await loadFile();
-
-	await loadReferenceLists();
+export async function processFile(fileData) {
+	fileMeta = fileData.metadata;
+	fileContent = fileData.content;
 
 	await processTypos();
 
@@ -179,7 +207,7 @@ function getIntersectionNeedId(fn1, fn2) {
 async function expandAccomtypeMappings() {
 	let result = new Array();
 	const mappings = fileMeta["accomtype-mappings"];
-	console.log(mappings);
+	if (typeof (mappings.find((mapping) => mapping["intersection"])) !== "undefined") throw new Error("Skipping intersections");
 
 	mappings.forEach(function (mapping) {
 		// make sure the values are arrays
@@ -552,6 +580,7 @@ async function promptTypoCorrections() {
 	const answers = await inquirer.prompt(questions).then((answers) => answers);
 	for (var i = 0; i < questions.length; i++) {
 		let qid = "q" + i;
+		if (qid == "[Skip file]") throw new Error("Skipped during typo check");
 		let listname = questionLists[qid];
 		storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
 	}
@@ -575,7 +604,7 @@ function makeInquirerQuestion(qId, label, listname) {
 		type: "rawlist",
 		name: qId,
 		message: "Unable to find '" + label + "'. Please select the correct item from the list.",
-		choices: getOneProp(arr, 'label'),
+		choices: ["[Skip file]"].concat(getOneProp(arr, 'label')),
 		waitUserInput: true,
 		loop: false
 	};
