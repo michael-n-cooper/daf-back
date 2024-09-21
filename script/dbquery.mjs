@@ -1,3 +1,5 @@
+import { scheduler } from 'node:timers/promises';
+
 const prefixes = `prefix :		<https://github.com/michael-n-cooper/a11y-data/daf/#>
 prefix a11y:	<https://aihal.net/accessibility/daf/#>
 prefix owl:		<http://www.w3.org/2002/07/owl#>
@@ -15,6 +17,7 @@ export async function selectQuery(sparql) {
 	    body: prefixes + sparql
 	  });
 	const json = await post_response.json();
+	await scheduler.wait(50);
 	return cleanResults(json);
 }
 
@@ -27,6 +30,7 @@ export async function updateQuery(sparql) {
 	  });
 	//const json = await post_response.json();
 	//return (json);
+	await scheduler.wait(50);
 	return true;
 }
 

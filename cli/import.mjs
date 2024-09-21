@@ -43,7 +43,7 @@ async function run() {
 			if (fileData == null) throw new Error("Unable to load " + fileName);
 
 			await processFile(fileData);
-			await scheduler.wait(100);
+			await scheduler.wait(200);
 		} catch (error) {
 			console.error(error.message);
 			console.error(error.trace);
@@ -128,6 +128,7 @@ export async function processFile(fileData) {
 	//#region Process data
 	const expandedMappings = await expandMappings(fileMeta);
 	const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
+	console.log(expandedAccommtypeMappings)
 
 	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
 	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
