@@ -6,6 +6,7 @@ import inquirer from 'inquirer';
 import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { scheduler } from 'node:timers/promises';
 
 //#region global
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
@@ -42,13 +43,13 @@ async function run() {
 			if (fileData == null) throw new Error("Unable to load " + fileName);
 
 			await processFile(fileData);
+			await scheduler.wait(100);
 		} catch (error) {
 			console.error(error.message);
 			console.error(error.trace);
 			await appendFile("./errors.txt", fileName + "\n");
 		}
 	};
-
 }
 
 //#region load file
@@ -76,8 +77,11 @@ async function loadFile(filePath, fileName, checkReimport) {
 	}
 
 	//check reimport
-	if (checkReimport) {
-		let toReimport = await checkDataReimport(fileName);
+	if (existing.length > 0) {
+		let toReimport = true;
+		if (checkReimport) {
+			toReimport = await checkDataReimport(fileName);
+		}
 		if (toReimport) {
 			stmtId = existing[0].id;
 			await deleteStatement(existing[0].id);
@@ -124,7 +128,6 @@ export async function processFile(fileData) {
 	//#region Process data
 	const expandedMappings = await expandMappings(fileMeta);
 	const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
-	console.log(expandedAccommtypeMappings);
 
 	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
 	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
@@ -144,7 +147,6 @@ export async function processFile(fileData) {
 		expandedMappings.forEach(function (mapping) {
 			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
-		console.log(expandedAccommtypeMappings)
 		expandedAccommtypeMappings.forEach(function (mapping) {
 			sparql += ' ; a11y:supports <' + mapping.id + '>';
 		});
@@ -166,7 +168,6 @@ export async function processFile(fileData) {
 			});
 		}
 		sparql += ' }';
-		//console.log(sparql);
 		const importResult = await dbquery.updateQuery(sparql);
 		console.log(JSON.stringify(importResult));
 	} else console.log("Aborting");
@@ -187,7 +188,7 @@ function getMatrixDimId(listname, label) {
 // find an intersection need in the local array from 2 functional need ids
 function getIntersectionNeedId(fn1, fn2) {
 	var inId;
-	const intersection = findObjectByProperties(intersectionNeedList, { "fn1": fn1, "fn2": fn2 });
+	const intersection = intersectionNeedList.find((obj) => { if (obj.fn1 == fn1 && obj.fn2 == fn2) return true; else return false; });
 
 	if (typeof intersection === 'undefined') {
 		inId = idBase + uuid();
@@ -210,6 +211,9 @@ async function expandAccomtypeMappings() {
 	if (typeof (mappings.find((mapping) => mapping["intersection"])) !== "undefined") throw new Error("Skipping intersections");
 
 	mappings.forEach(function (mapping) {
+		// check for keyword "all"
+		if (typeof mapping['functional-ability'] === 'string' && compareStr(mapping['functional-ability'], "all")) mapping['functional-ability'] = getOneProp(functionalAbilityList, 'label');
+
 		// make sure the values are arrays
 		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
 		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
@@ -286,7 +290,7 @@ async function expandMappings() {
 // get a single mapping object from the stored array, or add one if not exists
 async function getMappingId(mapping) {
 	var functionalNeedId = (mapping.FunctionalNeed || mapping.IntersectionNeed);
-	var result = findObjectByProperties(dbMappingIds, { "fnId": functionalNeedId, "unId": mapping.UserNeed, "unrId": mapping.UserNeedRelevance });
+	var result = dbMappingIds.find((obj) => { if (obj.fnId == functionalNeedId && obj.unId == mapping.UserNeed && obj.unrId == mapping.UserNeedRelevance) return true; else return false; });
 	if (typeof result === 'undefined') {
 		var mapType = "MatrixMapping";
 		if (typeof mapping.FunctionalNeed === 'undefined') mapType = "IntersectionMapping";
@@ -300,7 +304,7 @@ async function getMappingId(mapping) {
 }
 
 async function getAccommTypeMappingId(mapping) {
-	var result = findObjectByProperties(simpleCurveMaps, { "abilityId": mapping.abilityId, "accommId": mapping.accommId, "charId": mapping.charId });
+	var result = simpleCurveMaps.find((map) => { if (map.abilityId == mapping.abilityId && map.accommId == mapping.accommId && map.charId == mapping.charId) return true; else return false; });
 	if (typeof result === 'undefined') {
 		const id = idBase + uuid();
 		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
@@ -484,6 +488,7 @@ async function loadTypos() {
 		typoCorrectedList = typosObj;
 	} catch (err) {
 		console.error("loadTypos: " + err.message);
+		console.error(err.trace);
 	}
 }
 
@@ -497,7 +502,8 @@ async function saveTypos() {
 	try {
 		await writeFile(typosPath, JSON.stringify(typoCorrectedList), { encoding: 'utf8' });
 	} catch (err) {
-		console.error(err);
+		console.error(err.message);
+		console.error(err.trace);
 	}
 }
 
@@ -553,12 +559,12 @@ function checkPotentialTypo(listname, label) {
 		}
 	}
 	// check against previously stored list
-	let knownTypo = findObjectByProperties(typoCorrectedList, { "listname": listname, "incorrect": label });
+	let knownTypo = typoCorrectedList.find((obj) => { if (obj.listname == listname && obj.incorrect == label) return true; else return false; });
 	if (typeof knownTypo !== 'undefined') {
 		return knownTypo.correct;
 	}
 	// check against already found list
-	let foundList = findObjectByProperties(foundTypos, { "listname": listname, "incorrect": label });
+	let foundList = foundTypos.find((obj) => { if (obj.listname == listname && obj.incorrect == label) return true; else return false; });
 	if (typeof foundList !== 'undefined') {
 		return foundList.correct;
 	}
@@ -578,17 +584,23 @@ async function promptTypoCorrections() {
 	});
 
 	const answers = await inquirer.prompt(questions).then((answers) => answers);
+	let skip = false;
 	for (var i = 0; i < questions.length; i++) {
 		let qid = "q" + i;
-		if (qid == "[Skip file]") throw new Error("Skipped during typo check");
-		let listname = questionLists[qid];
-		storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
+		if (answers[qid] == "[Skip file]") skip = true;
+		else {
+			let listname = questionLists[qid];
+			storeTypo(listname, foundTypos[i].incorrect, answers[qid]);
+		}
 	}
-	saveTypos();
+
+	await saveTypos();
+	foundTypos = [];
+	if (skip) throw new Error("Skipped during typo check");
 }
 
 function getCorrectLabel(listname, label) {
-	let typoCorrection = findObjectByProperties(typoCorrectedList, { "listname": listname, "incorrect": label });
+	let typoCorrection = typoCorrectedList.find((obj) => { if (obj.listname == listname && obj.incorrect == label) return true; else return false; });
 	if (typeof typoCorrection !== 'undefined') return typoCorrection.correct;
 	else return label;
 }

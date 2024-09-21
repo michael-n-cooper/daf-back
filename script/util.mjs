@@ -5,10 +5,7 @@ import * as commonmark from 'commonmark';
 export function findObjectByProperties(array, properties) {
 	return array.find(obj => {
 		// Check if all specified properties match
-		return Object.getOwnPropertyNames(properties).every(key => {
-			//console.log ("key: " + key + "; obj: " + obj[key] + "; property: " + properties[key])
-			if (compareStr(obj[key], properties[key])) return obj;
-		});
+		return Object.getOwnPropertyNames(properties).every(key => compareStr(obj[key], properties[key]));
 	});
 }
 export function filterObjectByProperties(array, properties) {
@@ -25,6 +22,7 @@ export function idFrag(uri) {
 }
 
 export function compareStr(str1, str2) {
+	//if (typeof str1 !== "string" || typeof str2 !== "string") return false;
 	if (str1.trim().replace(/\s+/g, ' ').toLowerCase() == str2.trim().replace(/\s+/g, ' ').toLowerCase()) return true;
 	else return false;
 }

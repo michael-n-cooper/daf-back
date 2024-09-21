@@ -144,7 +144,6 @@ async function findSimpleCurveMapList(id = null, supportsFilter = "") {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { :" + id + " } . ";
     const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accommId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . optional { ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
-	console.log(sparql);
 	const val = await selectQuery(sparql);
     return val;
 }
@@ -166,13 +165,14 @@ async function lookupTypeId(type, id) {
 }
 
 async function findStatementList(supportsFilter = "") {
-    const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:note ?note} } order by ?label" 
+    const sparql = "select distinct ?id ?label ?type ?stmt where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} } order by ?label" 
+	console.log(sparql);
     const val = await selectQuery(sparql);
     return val;
 }
 async function findStatementId(id) {
-    const sparql = "select distinct ?id ?label ?type ?stmt ?note ?contentIRI where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:contentIRI ?contentIRI} . optional { ?id a11y:note ?note} } order by ?label" 
-    const val = await selectQuery(sparql);
+    const sparql = "select distinct ?id ?label ?type ?stmt ?note ?contentIRI where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:contentIRI ?contentIRI} . optional { ?id a11y:note ?note} } order by ?label";
+	const val = await selectQuery(sparql);
     
     const refs = await findReferenceList(" :" + id + " a11y:references ?id . ");
     val[0].references = refs;
