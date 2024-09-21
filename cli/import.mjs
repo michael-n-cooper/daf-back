@@ -7,6 +7,7 @@ import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scheduler } from 'node:timers/promises';
+import { map } from '../app';
 
 //#region global
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
@@ -43,13 +44,14 @@ async function run() {
 			if (fileData == null) throw new Error("Unable to load " + fileName);
 
 			await processFile(fileData);
-			await scheduler.wait(200);
+			await scheduler.wait(1000);
 		} catch (error) {
 			console.error(error.message);
 			console.error(error.trace);
 			await appendFile("./errors.txt", fileName + "\n");
 		}
 	};
+	console.log("Done");
 }
 
 //#region load file
@@ -111,7 +113,7 @@ async function loadReferenceLists() {
 	functionalAbilityList = await apiGet("functional-abilities");
 	accommodationTypeList = await apiGet("accommodation-types");
 	accessibilityCharacteristicList = await apiGet("accessibility-characteristics");
-	simpleCurveMaps = await apiGet("simple-curve-maps")
+	simpleCurveMaps = await apiGet("simple-curve-maps");
 
 	knownMatrix = [{ "listname": "accommodation-types", "list": accommodationTypeList }, { "listname": "accessibility-characteristics", "list": accessibilityCharacteristicList }, { "listname": "functional-abilities", "list": functionalAbilityList }, { "listname": "functional-needs", "list": functionalNeedList }, { "listname": "intersection-needs", "list": intersectionNeedList }, { "listname": "user-needs", "list": userNeedList }, { "listname": "user-need-contexts", "list": userNeedContextList }];
 
@@ -127,8 +129,7 @@ export async function processFile(fileData) {
 
 	//#region Process data
 	const expandedMappings = await expandMappings(fileMeta);
-	const expandedAccommtypeMappings = await expandAccomtypeMappings(fileMeta);
-	console.log(expandedAccommtypeMappings)
+	const expandedAccommtypeMappings = await expandAccommtypeMappings(fileMeta);
 
 	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
 	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
@@ -206,15 +207,13 @@ function getIntersectionNeedId(fn1, fn2) {
 
 //#region Mappings
 // accommodation type mappings
-async function expandAccomtypeMappings() {
+async function expandAccommtypeMappings() {
 	let result = new Array();
 	const mappings = fileMeta["accomtype-mappings"];
+	if (typeof mappings === "undefined") return;
 	if (typeof (mappings.find((mapping) => mapping["intersection"])) !== "undefined") throw new Error("Skipping intersections");
 
 	mappings.forEach(function (mapping) {
-		// check for keyword "all"
-		if (typeof mapping['functional-ability'] === 'string' && compareStr(mapping['functional-ability'], "all")) mapping['functional-ability'] = getOneProp(functionalAbilityList, 'label');
-
 		// make sure the values are arrays
 		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
 		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
@@ -247,13 +246,9 @@ async function expandAccomtypeMappings() {
 async function expandMappings() {
 	let result = new Array();
 	const mappings = fileMeta.mappings;
+	if (typeof mappings === "undefined") return;
 
 	mappings.forEach(function (mapping) {
-		// check for keyword "all"
-		if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
-		if (typeof mapping['user-need'] === 'string' && compareStr(mapping['user-need'], "all")) mapping['user-need'] = getOneProp(userNeedList, 'label');
-		if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedContextList, 'label');
-
 		// make sure the values are arrays
 		const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
 		const userNeeds = (typeof mapping['user-need'] === 'string') ? [mapping['user-need']] : mapping['user-need'];
@@ -511,44 +506,55 @@ async function saveTypos() {
 // look for potential typos in the yaml mappings
 async function findMatrixTypos() {
 	const mp = fileMeta.mappings;
-	mp.forEach(function (mapping) {
-		//check for arrays Array.isArray(obj)
-		//handle intersection objects
-		const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
-		const userNeeds = (typeof mapping['user-need'] === 'string') ? [mapping['user-need']] : mapping['user-need'];
-		const userNeedRelevances = (typeof mapping['user-need-relevance'] === 'string') ? [mapping['user-need-relevance']] : mapping['user-need-relevance'];
+	if (typeof mp !== "undefined") {
+		mp.forEach(function (mapping) {
+			//check for arrays Array.isArray(obj)
+			//handle intersection objects
 
-		functionalNeeds.forEach(function (functionalNeed) {
-			if (typeof functionalNeed === 'object') {
-				checkPotentialTypo("functional-needs", functionalNeed.intersection[0]);
-				checkPotentialTypo("functional-needs", functionalNeed.intersection[1]);
-			} else checkPotentialTypo("functional-needs", functionalNeed);
-			userNeeds.forEach(function (userNeed) {
-				checkPotentialTypo("user-needs", userNeed);
-				userNeedRelevances.forEach(function (userNeedRelevance) {
-					checkPotentialTypo("user-need-contexts", userNeedRelevance);
+			// check for keyword "all"
+			if (typeof mapping['functional-need'] === 'string' && compareStr(mapping['functional-need'], "all")) mapping['functional-need'] = getOneProp(functionalNeedList, 'label');
+			if (typeof mapping['user-need'] === 'string' && compareStr(mapping['user-need'], "all")) mapping['user-need'] = getOneProp(userNeedList, 'label');
+			if (typeof mapping['user-need-relevance'] === 'string' && compareStr(mapping['user-need-relevance'], "all")) mapping['user-need-relevance'] = getOneProp(userNeedContextList, 'label');
+
+			const functionalNeeds = (typeof mapping['functional-need'] === 'string' || (typeof mapping['functional-need'] === 'object' && !Array.isArray(mapping['functional-need']))) ? [mapping['functional-need']] : mapping['functional-need'];
+			const userNeeds = (typeof mapping['user-need'] === 'string') ? [mapping['user-need']] : mapping['user-need'];
+			const userNeedRelevances = (typeof mapping['user-need-relevance'] === 'string') ? [mapping['user-need-relevance']] : mapping['user-need-relevance'];
+
+			functionalNeeds.forEach(function (functionalNeed) {
+				if (typeof functionalNeed === 'object') {
+					checkPotentialTypo("functional-needs", functionalNeed.intersection[0]);
+					checkPotentialTypo("functional-needs", functionalNeed.intersection[1]);
+				} else checkPotentialTypo("functional-needs", functionalNeed);
+				userNeeds.forEach(function (userNeed) {
+					checkPotentialTypo("user-needs", userNeed);
+					userNeedRelevances.forEach(function (userNeedRelevance) {
+						checkPotentialTypo("user-need-contexts", userNeedRelevance);
+					});
 				});
 			});
 		});
-	});
+	}
+	const accommTypeMappings = fileMeta["accomtype-mappings"];
+	if (typeof accommTypeMappings !== "undefined") {
+		accommTypeMappings.forEach(function (mapping) {
+			// check for keyword "all"
+			if (typeof mapping['functional-ability'] === 'string' && compareStr(mapping['functional-ability'], "all")) mapping['functional-ability'] = getOneProp(functionalAbilityList, 'label');
 
-	const accomTypeMappings = fileMeta["accomtype-mappings"];
-	accomTypeMappings.forEach(function (mapping) {
-		const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
-		const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
-		const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
+			const functionalAbilities = (typeof mapping['functional-ability'] === 'string') ? [mapping['functional-ability']] : mapping['functional-ability'];
+			const accommodationTypes = (typeof mapping['accommodation-type'] === 'string') ? [mapping['accommodation-type']] : mapping['accommodation-type'];
+			const accessibilityCharacteristics = (typeof mapping['accessibility-characteristic'] === 'string') ? [mapping['accessibility-characteristic']] : mapping['accessibility-characteristic'];
 
-		functionalAbilities.forEach(function (functionalAbility) {
-			checkPotentialTypo("functional-abilities", functionalAbility);
-			accommodationTypes.forEach(function (accommodationType) {
-				checkPotentialTypo("accommodation-types", accommodationType);
-				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					checkPotentialTypo("accessibility-characteristics", accessibilityCharacteristic);
+			functionalAbilities.forEach(function (functionalAbility) {
+				checkPotentialTypo("functional-abilities", functionalAbility);
+				accommodationTypes.forEach(function (accommodationType) {
+					checkPotentialTypo("accommodation-types", accommodationType);
+					accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
+						checkPotentialTypo("accessibility-characteristics", accessibilityCharacteristic);
+					});
 				});
 			});
 		});
-	});
-
+	}
 }
 
 function checkPotentialTypo(listname, label) {

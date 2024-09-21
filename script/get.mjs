@@ -43,7 +43,7 @@ export async function getId(req) {
 async function findAbilityAccommodationIntersectionList(id = null) {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { : " + id + " } . ";
-    const sparql = "select ?id ?label ?abilityId ?abilityLabel ?accommId ?accomLabel where { " + idFilter + " ?id a a11y:AccessibilityAccommodationIntersectionMap . optional { ?id rdfs:label ?label } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel .  ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?abilityId rdfs:label ?accomLabel }";
+    const sparql = "select ?id ?label ?abilityId ?abilityLabel ?accommId ?accommLabel where { " + idFilter + " ?id a a11y:AccessibilityAccommodationIntersectionMap . optional { ?id rdfs:label ?label } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel .  ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?abilityId rdfs:label ?accommLabel }";
     const val = await selectQuery(sparql);
 
     const stmts = await findStatementList(" ?id a11y:supports/a11y:supports :" + id + " . ");
@@ -143,7 +143,8 @@ async function findIntersectionCurveMapId(id) {
 async function findSimpleCurveMapList(id = null, supportsFilter = "") {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { :" + id + " } . ";
-    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accommId ?accomLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . optional { ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accomLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accommId ?accommLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . optional { ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accommLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
+    //console.log("--findSimpleCurveMapList " + sparql)
 	const val = await selectQuery(sparql);
     return val;
 }
@@ -166,7 +167,7 @@ async function lookupTypeId(type, id) {
 
 async function findStatementList(supportsFilter = "") {
     const sparql = "select distinct ?id ?label ?type ?stmt where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} } order by ?label" 
-	console.log(sparql);
+	//console.log("--findStatementList " + sparql);
     const val = await selectQuery(sparql);
     return val;
 }
