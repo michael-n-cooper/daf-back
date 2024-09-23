@@ -198,6 +198,7 @@ function getIntersectionNeedId(fn1, fn2) {
 		const label2 = findObjectByProperties(functionalNeedList, { "id": fn2 }).label;
 		const update = 'insert data { <' + inId + '> a a11y:IntersectionNeed ; a11y:supports <' + fn1 + '> ; a11y:supports <' + fn2 + '> ; rdfs:label "' + label1 + " and " + label2 + '"@en}';
 		dbquery.updateQuery(update);
+		intersectionNeedList.push({id: inId, label: label1 + " and " + label2, fn1: fn1, fn2: fn2});
 	} else {
 		inId = intersection.id;
 	}
@@ -293,6 +294,7 @@ async function getMappingId(mapping) {
 		const id = idBase + uuid();
 		const update = 'insert data { <' + id + '> a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
 		await dbquery.updateQuery(update);
+		dbMappingIds.push({id: id, fnId: functionalNeedId, unId: mapping.UserNeed, unrId: mapping.UserNeedRelevance});
 		return (idBase + id);
 	} else {
 		return result.id;
@@ -305,6 +307,7 @@ async function getAccommTypeMappingId(mapping) {
 		const id = idBase + uuid();
 		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
 		await dbquery.updateQuery(update);
+		simpleCurveMaps.push({id: id, abilityId: mapping.abilityId, accommId: mapping.accommId, charId: mapping.charId});
 		return (idBase + id);
 	} else {
 		return result.id;
@@ -325,6 +328,7 @@ function getIdByLabel(arr, label, addClass) {
 		id = idBase + uuid();
 		const updateSparql = 'insert data { <' + id + '> a a11y:' + addClass + ' ; rdfs:label "' + label + '"@en }';
 		dbquery.updateQuery(updateSparql);
+		arr.push({id: id, label: label});
 	}
 
 	return id;
