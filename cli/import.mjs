@@ -7,7 +7,6 @@ import * as commonmark from 'commonmark';
 import { v4 as uuid } from 'uuid';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scheduler } from 'node:timers/promises';
-import { map } from '../app';
 
 //#region global
 const importDir = '../../../accessiblecommunity/Digital-Accessibility-Framework/';
