@@ -166,13 +166,14 @@ async function lookupTypeId(type, id) {
 }
 
 async function findStatementList(supportsFilter = "") {
-    const sparql = "select distinct ?id ?label ?type ?stmt where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} } order by ?label" 
+    const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional {?id a11y:note ?note } } order by ?label" 
 	console.log("--findStatementList " + sparql);
     const val = await selectQuery(sparql);
     return val;
 }
 async function findStatementId(id) {
     const sparql = "select distinct ?id ?label ?type ?stmt ?note ?contentIRI where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:contentIRI ?contentIRI} . optional { ?id a11y:note ?note} } order by ?label";
+	console.log("--findStatementId " + sparql);
 	const val = await selectQuery(sparql);
     
     const refs = await findReferenceList(" :" + id + " a11y:references ?id . ");

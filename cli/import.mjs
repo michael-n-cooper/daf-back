@@ -14,15 +14,11 @@ const typosPath = './typos.json';
 const contentIriBase = 'https://github.com/accessiblecommunity/Digital-Accessibility-Framework/';
 const idBase = "https://github.com/michael-n-cooper/a11y-data/daf/#";
 
-var fileMeta, fileContent;
 var functionalNeedList, intersectionNeedList, userNeedList, userNeedContextList, referenceTypes, tags, dbMappingIds; // ids of the mapping objects corresponding to the above
 var functionalAbilityList, accommodationTypeList, accessibilityCharacteristicList, simpleCurveMaps;
 var knownMatrix;
-var typoCorrectedList = new Array();
-var foundTypos = new Array();
-var importFileName;
-
-var stmtId = null;
+var typoCorrectedList = [];
+var foundTypos = [];
 //#endregion
 
 async function run() {
@@ -55,7 +51,7 @@ async function run() {
 
 //#region load file
 async function loadFile(filePath, fileName, checkReimport) {
-	stmtId = null;
+	let stmtId = null;
 	const fileData = await getFileData(filePath);
 	const existing = await stmtIdFromFilename(fileName);
 
@@ -80,23 +76,21 @@ async function loadFile(filePath, fileName, checkReimport) {
 
 	//check reimport
 	if (existing.length > 0) {
+		stmtId = existing[0].id;
 		let toReimport = true;
 		if (checkReimport) {
 			toReimport = await checkDataReimport(fileName);
 		}
-		if (toReimport) {
-			stmtId = existing[0].id;
-			await deleteStatement(existing[0].id);
-		} else {
+		if (!toReimport) {
 			console.log("Skipping reimport of " + fileName);
 			return null;
 		}
 	}
 
-	importFileName = fileName;
+	if (stmtId == null) stmtId = idBase + uuid();
 
-	const result = parseMD(fileData);
-	return result;
+	const parsed = parseMD(fileData);
+	return { stmtId: stmtId, fileName: fileName, metadata: parsed.metadata, content: parsed.content };
 }
 //#endregion
 
@@ -122,16 +116,18 @@ async function loadReferenceLists() {
 //#endregion
 
 export async function processFile(fileData) {
-	fileMeta = fileData.metadata;
-	fileContent = fileData.content;
+	let stmtId = fileData.stmtId;
+	let importFileName = fileData.fileName;
+	let fileMeta = fileData.metadata;
+	let fileContent = fileData.content;
 
-	await processTypos();
+	await processTypos(fileMeta);
 
 	//#region Process data
 	const expandedMappings = await expandMappings(fileMeta);
 	const expandedAccommtypeMappings = await expandAccommtypeMappings(fileMeta);
 
-	const tagsArr = fileMeta.tags ? fileMeta.tags : new Array(); // retrieve tags
+	const tagsArr = fileMeta.tags ? fileMeta.tags : []; // retrieve tags
 	const { research, guidelines } = retrieveReferences(fileMeta); // retrieve references, divide into research and guidelines
 	const { title, statement, notes } = retrieveContent(fileContent); // retrieve title and statement
 	//#endregion
@@ -139,7 +135,6 @@ export async function processFile(fileData) {
 	//#region Build sparql
 
 	// construct the sparql statement
-	if (stmtId == null) stmtId = idBase + uuid();
 	let sparql = 'insert data { <' + stmtId + '> a a11y:AccessibilityStatement ; a owl:NamedIndividual ';
 	sparql += ' ; a11y:stmtGuidance "' + escSparql(statement) + '"@en';
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
@@ -169,8 +164,11 @@ export async function processFile(fileData) {
 		});
 	}
 	sparql += ' }';
+	await deleteStatement(stmtId);
+	//console.log(sparql);
 	const importResult = await dbquery.updateQuery(sparql);
 	console.log(JSON.stringify(importResult));
+	return true;
 }
 //#endregion
 
@@ -206,8 +204,8 @@ function getIntersectionNeedId(fn1, fn2) {
 
 //#region Mappings
 // accommodation type mappings
-async function expandAccommtypeMappings() {
-	let result = new Array();
+async function expandAccommtypeMappings(fileMeta) {
+	let result = [];
 	const mappings = fileMeta["accomtype-mappings"];
 	if (typeof mappings === "undefined") return;
 	if (typeof (mappings.find((mapping) => mapping["intersection"])) !== "undefined") throw new Error("Skipping intersections");
@@ -231,7 +229,7 @@ async function expandAccommtypeMappings() {
 		});
 	});
 
-	var returnVal = new Array();
+	var returnVal = [];
 	for await (let mapping of result) {
 		let mappingId = await getAccommTypeMappingId(mapping);
 		returnVal.push({ id: mappingId, mapping: mapping });
@@ -241,8 +239,8 @@ async function expandAccommtypeMappings() {
 }
 
 // matrix mappings
-async function expandMappings() {
-	let result = new Array();
+async function expandMappings(fileMeta) {
+	let result = [];
 	const mappings = fileMeta.mappings;
 	if (typeof mappings === "undefined") return;
 
@@ -272,7 +270,7 @@ async function expandMappings() {
 		});
 	});
 
-	let returnVal = new Array();
+	let returnVal = [];
 	for await (let mapping of result) {
 		let mappingId = await getMappingId(mapping);
 		returnVal.push({ id: mappingId, mapping: mapping })
@@ -292,7 +290,7 @@ async function getMappingId(mapping) {
 		const update = 'insert data { <' + id + '> a a11y:' + mapType + ' ; a owl:NamedIndividual ; a11y:supports <' + functionalNeedId + '> ; a11y:supports <' + mapping.UserNeed + '> ; a11y:supports <' + mapping.UserNeedRelevance + '> }';
 		await dbquery.updateQuery(update);
 		dbMappingIds.push({ id: id, fnId: functionalNeedId, unId: mapping.UserNeed, unrId: mapping.UserNeedRelevance });
-		return (idBase + id);
+		return (id);
 	} else {
 		return result.id;
 	}
@@ -305,7 +303,7 @@ async function getAccommTypeMappingId(mapping) {
 		const update = 'insert data { <' + id + '> a a11y:SimpleCurveMap ; a owl:NamedIndividual ; a11y:supports <' + mapping.abilityId + '> ; a11y:supports <' + mapping.accommId + '> ; a11y:supports <' + mapping.charId + '> }';
 		await dbquery.updateQuery(update);
 		simpleCurveMaps.push({ id: id, abilityId: mapping.abilityId, accommId: mapping.accommId, charId: mapping.charId });
-		return (idBase + id);
+		return (id);
 	} else {
 		return result.id;
 	}
@@ -333,7 +331,7 @@ function getIdByLabel(arr, label, addClass) {
 
 // get an array of {id, label} for a class
 async function lookupIdLabels(type) {
-	var returnval = new Array();
+	var returnval = [];
 	const sparql = 'select ?id ?label where { ?id a a11y:' + type + ' ; rdfs:label ?label } order by ?label';
 	const results = await dbquery.selectQuery(sparql);
 	if (results.length > 0) {
@@ -366,6 +364,7 @@ async function stmtIdFromFilename(importFileName) {
 }
 
 async function deleteStatement(id) {
+	console.log("Deleting " + id);
 	const updateSparql1 = 'delete where { <' + id + '> a11y:references ?s . ?s ?p ?o}';
 	const updateSparql2 = 'delete where { <' + id + '> ?p ?o }';
 	await dbquery.updateQuery(updateSparql1);
@@ -376,8 +375,8 @@ async function deleteStatement(id) {
 //#region content
 // references
 function retrieveReferences(fileMeta) {
-	var research = new Array();
-	var guidelines = new Array();
+	var research = [];
+	var guidelines = [];
 	if (fileMeta.references) {
 		const references = fileMeta.references;
 
@@ -471,7 +470,7 @@ function retrieveContent(fileContent) {
 
 //#region Typo handling
 // process typos
-async function processTypos() {
+async function processTypos(fileMeta) {
 	await findMatrixTypos(fileMeta);
 	await promptTypoCorrections();
 }
@@ -507,7 +506,7 @@ async function saveTypos() {
 }
 
 // look for potential typos in the yaml mappings
-async function findMatrixTypos() {
+async function findMatrixTypos(fileMeta) {
 	const mp = fileMeta.mappings;
 	if (typeof mp !== "undefined") {
 		mp.forEach(function (mapping) {
@@ -584,8 +583,8 @@ function checkPotentialTypo(listname, label) {
 }
 
 async function promptTypoCorrections() {
-	let questions = new Array();
-	let questionLists = new Array();
+	let questions = [];
+	let questionLists = [];
 
 	foundTypos.forEach(function (typo, index) {
 		let qid = "q" + index;
