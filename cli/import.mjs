@@ -220,11 +220,11 @@ async function expandAccommtypeMappings() {
 
 		// expand out arrays of mapped items
 		functionalAbilities.forEach(function (functionalAbility) {
-			const functionalAbilityId = getMatrixDimId("functional-abilities", functionalAbility);
+			const functionalAbilityId = getMatrixDimId("functional-abilities", getCorrectLabel("functional-abilities", functionalAbility));
 			accommodationTypes.forEach(function (accommodationType) {
-				const accommodationTypeId = getMatrixDimId("accommodation-types", accommodationType);
+				const accommodationTypeId = getMatrixDimId("accommodation-types", getCorrectLabel("accommodation-types", accommodationType));
 				accessibilityCharacteristics.forEach(function (accessibilityCharacteristic) {
-					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", accessibilityCharacteristic);
+					const accessibilityCharacteristicId = getMatrixDimId("accessibility-characteristics", getCorrectLabel("accessibility-characteristics", accessibilityCharacteristic));
 					result.push({ "abilityId": functionalAbilityId, "accommId": accommodationTypeId, "charId": accessibilityCharacteristicId });
 				});
 			});
@@ -232,11 +232,10 @@ async function expandAccommtypeMappings() {
 	});
 
 	var returnVal = new Array();
-	result.forEach(async function (mapping) {
+	for await (let mapping of result) {
 		let mappingId = await getAccommTypeMappingId(mapping);
-		let pushObj = { id: mappingId, mapping: mapping };
-		returnVal.push(pushObj);
-	});
+		returnVal.push({ id: mappingId, mapping: mapping });
+	};
 
 	return (returnVal);
 }
@@ -274,10 +273,10 @@ async function expandMappings() {
 	});
 
 	let returnVal = new Array();
-	result.forEach(async function (mapping) {
+	for await (let mapping of result) {
 		let mappingId = await getMappingId(mapping);
 		returnVal.push({ id: mappingId, mapping: mapping })
-	});
+	};
 
 	return (returnVal);
 }
@@ -362,9 +361,7 @@ async function checkDataReimport(importFileName) {
 async function stmtIdFromFilename(importFileName) {
 	const contentIri = contentIriBase + importFileName;
 	const sparql = 'select ?id ?label where { ?id a11y:contentIRI <' + contentIri + '> ; rdfs:label ?label }';
-	console.log("stmtIdFromFilename " + sparql)
 	const result = await dbquery.selectQuery(sparql);
-	console.log(result);
 	return result;
 }
 
@@ -500,7 +497,9 @@ function storeTypo(listname, inc, cor) {
 // save the list of typos
 async function saveTypos() {
 	try {
-		await writeFile(typosPath, JSON.stringify(typoCorrectedList), { encoding: 'utf8' });
+		let res = Array.from(new Set(typoCorrectedList.map(JSON.stringify)))
+			.map(JSON.parse); // eliminate duplicates
+		await writeFile(typosPath, JSON.stringify(res), { encoding: 'utf8' });
 	} catch (err) {
 		console.error(err.message);
 		console.error(err.trace);

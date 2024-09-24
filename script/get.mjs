@@ -167,7 +167,7 @@ async function lookupTypeId(type, id) {
 
 async function findStatementList(supportsFilter = "") {
     const sparql = "select distinct ?id ?label ?type ?stmt where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} } order by ?label" 
-	//console.log("--findStatementList " + sparql);
+	console.log("--findStatementList " + sparql);
     const val = await selectQuery(sparql);
     return val;
 }
