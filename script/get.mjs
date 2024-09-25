@@ -167,13 +167,13 @@ async function lookupTypeId(type, id) {
 
 async function findStatementList(supportsFilter = "") {
     const sparql = "select distinct ?id ?label ?type ?stmt ?note where {" + supportsFilter + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional {?id a11y:note ?note } } order by ?label" 
-	console.log("--findStatementList " + sparql);
+	//console.log("--findStatementList " + sparql);
     const val = await selectQuery(sparql);
     return val;
 }
 async function findStatementId(id) {
     const sparql = "select distinct ?id ?label ?type ?stmt ?note ?contentIRI where { values ?id {:" + id + "} . " + narrowType("AccessibilityStatement") + " ?id a11y:stmtGuidance ?stmt . optional {?id rdfs:label ?label} . optional { ?id a11y:contentIRI ?contentIRI} . optional { ?id a11y:note ?note} } order by ?label";
-	console.log("--findStatementId " + sparql);
+	//console.log("--findStatementId " + sparql);
 	const val = await selectQuery(sparql);
     
     const refs = await findReferenceList(" :" + id + " a11y:references ?id . ");
@@ -241,7 +241,9 @@ async function findUserNeedCategories(id) {
 */
 async function findMappingId(id) {
     const sparql = "select ?id ?applicable ?fnId ?unId ?unrId ?type where { values ?id {:" + id + "} . " + narrowType("Mapping") + " { ?fnId a a11y:FunctionalNeed . ?id  a11y:supports ?fnId } union { ?fnId a a11y:IntersectionNeed . ?id a11y:supports ?fnId } . ?id a11y:supports ?unId ; a11y:supports ?unrId . ?unId a a11y:UserNeed . ?unrId a a11y:UserNeedRelevance . optional { ?id a11y:applicable ?applicable } }";
+    //console.log("--findMappingId " + sparql);
     const val = await selectQuery(sparql);
+    if (val.length == 0) return {id: ""};
 
     const stmts = await findStatementList(" ?id a11y:supports :" + id + " . ");
     val[0].statements = stmts;
