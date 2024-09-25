@@ -22,20 +22,44 @@ var foundTypos = [];
 //#endregion
 
 async function run() {
-	await loadReferenceLists();
-
-	const answers = await inquirer.prompt([{ name: "mode", message: "Import single file or directory?", type: "list", choices: [{ name: "File", value: "file" }, { "name": "Dir", "value": "dir" }] }, { name: "path", message: "File or directory name:" }]);
-
 	const foldersPath = pathToFileURL(importDir).href.replace('///', '//');
 
 	let fileNames;
-	if (answers.mode == "file") fileNames = [answers.path];
-	else fileNames = await readdir(fileURLToPath(foldersPath));
+
+	const answers = await inquirer.prompt([
+		{
+			name: "mode", message: "Import single file or directory?", type: "list", 
+			choices: [
+				{ name: "File", value: "file" }, 
+				{ name: "Dir", value: "dir" },
+				{ name: "Delete", value: "del" },
+				{ name: "Clear", value: "clear"}
+			]
+		}
+	]
+	);
+
+	if (answers.mode == "file" || answers.mode == "del") {
+		const filename = await inquirer.prompt([
+			{ name: "path", message: "File name:" }
+		]);
+		fileNames = [filename.path];
+	} else {
+		fileNames = await readdir(fileURLToPath(foldersPath));
+	}
+
+	if (answers.mode == "clear") {
+		await deleteMissingFiles(fileNames);
+		return;
+	}
+
+	await loadReferenceLists();
 
 	for await (let fileName of fileNames) {
 		try {
 			console.log("Processing " + fileName);
 			let fileData = await loadFile(fileURLToPath(foldersPath) + fileName, fileName, answers.mode == "file" ? true : false);
+			if (fileData == "del") return;
 			if (fileData == null) throw new Error("Unable to load " + fileName);
 
 			await processFile(fileData);
@@ -63,10 +87,10 @@ async function loadFile(filePath, fileName, checkReimport) {
 			if (toDel) {
 				await deleteStatement(existing[0].id);
 				console.log("Deleted " + existing.label);
-				return null;
+				return false;
 			} else {
 				console.log("Skipping delete of " + fileName);
-				return null;
+				return false;
 			}
 		} else {
 			console.log("Invalid filename " + fileName);
@@ -369,6 +393,22 @@ async function deleteStatement(id) {
 	const updateSparql2 = 'delete where { <' + id + '> ?p ?o }';
 	await dbquery.updateQuery(updateSparql1);
 	await dbquery.updateQuery(updateSparql2);
+}
+
+async function deleteMissingFiles(fileNames) {
+	const confirm = await inquirer.prompt([{ "type": "confirm", "name": "delete", "message": "Are you sure? This will delete all statements connected to files no longer in the import directory." }]).then((answer) => answer.delete);
+	if (!confirm) return;
+
+	let sparql = "select ?id ?contentIri where { ?id a11y:contentIRI ?contentIri }";
+	let results = await dbquery.selectQuery(sparql);
+	for await (let result of results) {
+		let contentFilename = result.contentIri.substring(result.contentIri.lastIndexOf("/") + 1);
+		let stillThere = fileNames.find((filename) => filename == contentFilename);
+		if (typeof stillThere === "undefined") {
+			console.log("Deleting " + contentFilename)
+			await deleteStatement(result.id);
+		}
+	};
 }
 //#endregion
 
