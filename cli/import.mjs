@@ -66,7 +66,7 @@ async function run() {
 			await scheduler.wait(1000);
 		} catch (error) {
 			console.error(error.message);
-			console.error(error.trace);
+			console.error(error.stack);
 			await appendFile("./errors.txt", fileName + "\n");
 		}
 	};
@@ -164,10 +164,10 @@ export async function processFile(fileData) {
 	sparql += ' ; rdfs:label "' + escSparql(title) + '"@en';
 	if (notes.length > 0) sparql += ' ; a11y:note "' + escSparql(notes) + '"@en';
 	sparql += ' ; a11y:contentIRI <' + contentIriBase + importFileName + ">";
-	expandedMappings.forEach(function (mapping) {
+	if (typeof expandedMappings !== "undefined") expandedMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
-	expandedAccommtypeMappings.forEach(function (mapping) {
+	if (typeof expandedAccommtypeMappings !== "undefined") expandedAccommtypeMappings.forEach(function (mapping) {
 		sparql += ' ; a11y:supports <' + mapping.id + '>';
 	});
 	tagsArr.forEach(function (tag) {
@@ -524,7 +524,7 @@ async function loadTypos() {
 		typoCorrectedList = typosObj;
 	} catch (err) {
 		console.error("loadTypos: " + err.message);
-		console.error(err.trace);
+		console.error(err.stack);
 	}
 }
 
@@ -541,7 +541,7 @@ async function saveTypos() {
 		await writeFile(typosPath, JSON.stringify(res), { encoding: 'utf8' });
 	} catch (err) {
 		console.error(err.message);
-		console.error(err.trace);
+		console.error(err.stack);
 	}
 }
 
