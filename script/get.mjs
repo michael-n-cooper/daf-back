@@ -140,10 +140,10 @@ async function findIntersectionCurveMapId(id) {
     return val;
 }
 
-async function findSimpleCurveMapList(id = null, supportsFilter = "") {
+async function findSimpleCurveMapList(id = null, supportsFilter = "", simple = false) {
     let idFilter = "";
     if (id != null) idFilter = " values ?id { :" + id + " } . ";
-    const sparql = "select ?id ?stmtId ?abilityId ?abilityLabel ?accommId ?accommLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . optional { ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id } . ?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accommLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
+    const sparql = "select ?id " + (!simple? "?stmtId" : "") + " ?abilityId ?abilityLabel ?accommId ?accommLabel ?charId ?charLabel ?applicable where { " + idFilter + supportsFilter + " ?id a a11y:SimpleCurveMap . " + (!simple ? "optional { ?stmtId a a11y:AccessibilityStatement . ?stmtId a11y:supports ?id } . " : "") + "?id a11y:supports ?abilityId . ?abilityId a a11y:FunctionalAbility . ?abilityId rdfs:label ?abilityLabel . ?id a11y:supports ?accommId . ?accommId a a11y:AccommodationType . ?accommId rdfs:label ?accommLabel . ?id a11y:supports ?charId . ?charId a a11y:AccessibilityCharacteristic . ?charId rdfs:label ?charLabel . optional { ?id a11y:applicable ?applicable } }";
     //console.log("--findSimpleCurveMapList " + sparql)
 	const val = await selectQuery(sparql);
     return val;
@@ -185,7 +185,7 @@ async function findStatementId(id) {
     const mappings = await findMappingList("Mapping", ":" + id + " a11y:supports ?id . ");
     val[0].mappings = mappings;
 
-    const simpleCurveMaps = await findSimpleCurveMapList(null, " :" + id + " a11y:supports ?id . ");
+    const simpleCurveMaps = await findSimpleCurveMapList(null, " :" + id + " a11y:supports ?id . ", true);
     val[0]["simple-curve-maps"] = simpleCurveMaps;
 
     return val;
